@@ -1,9 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"log"
+
+	"github.com/drekunov/gc/internal/app"
 )
 
 func main() {
-	fmt.Println("Welcome to the g-commander. Orthodox file manager")
+	err := app.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
