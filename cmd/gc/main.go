@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/drekunov/gc/internal/app"
 )
@@ -9,6 +9,6 @@ import (
 func main() {
 	err := app.Run()
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 }

@@ -7,8 +7,6 @@ import (
 )
 
 func Run() error {
-	fmt.Println("Welcome to the g-commander. Orthodox file manager")
-
 	app := tview.NewApplication()
 
 	mainWindow := tview.NewForm()
@@ -20,7 +18,7 @@ func Run() error {
 
 	err := app.SetRoot(mainWindow, true).Run()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to run application: %w", err)
 	}
 
 	return nil
