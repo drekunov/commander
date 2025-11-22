@@ -1,24 +1,14 @@
 package app
 
 import (
-	"fmt"
+	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/rivo/tview"
+	"github.com/drekunov/gc/internal/widgets/mainwindow"
 )
 
 func Run() error {
-	app := tview.NewApplication()
-
-	mainWindow := tview.NewForm()
-	mainWindow.SetBorder(true).SetTitle("g-commander")
-
-	mainWindow.AddButton("Quit", func() {
-		app.Stop()
-	})
-
-	err := app.SetRoot(mainWindow, true).Run()
-	if err != nil {
-		return fmt.Errorf("failed to run application: %w", err)
+	if _, err := tea.NewProgram(mainwindow.New(), tea.WithMouseAllMotion()).Run(); err != nil {
+		return err
 	}
 
 	return nil
