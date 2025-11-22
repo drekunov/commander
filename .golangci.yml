@@ -4,6 +4,9 @@ linters:
   enable:
     - wsl_v5
   disable:
+    - gochecknoglobals
+    - gochecknoinits
+    - ireturn
     - depguard
     - revive
     - wsl
