@@ -5,10 +5,11 @@ import (
 )
 
 type Config struct {
-	ButtonStyle       lipgloss.Style
-	ActiveButtonStyle lipgloss.Style
-	DialogBoxStyle    lipgloss.Style
-	TextStyle         lipgloss.Style
+	ButtonStyle        lipgloss.Style
+	ActiveButtonStyle  lipgloss.Style
+	PressedButtonStyle lipgloss.Style
+	DialogBoxStyle     lipgloss.Style
+	TextStyle          lipgloss.Style
 }
 
 var Values Config
@@ -26,14 +27,15 @@ func init() {
 	buttonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FFF7DB")).
 		Background(lipgloss.Color("#888B7E")).
-		Padding(0, 0).
-		MarginTop(1)
+		Padding(0, 1, 0, 1)
 
 	activeButtonStyle := buttonStyle.
 		Foreground(lipgloss.Color("#FFF7DB")).
 		Background(lipgloss.Color("#F25D94")).
-		MarginRight(0).
 		Underline(true)
+
+	pressedButtonStyle := activeButtonStyle.
+		Background(lipgloss.Color("#725D94"))
 
 	textStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FFF7DB")).
@@ -42,9 +44,10 @@ func init() {
 		MarginBottom(0)
 
 	Values = Config{
-		ButtonStyle:       buttonStyle,
-		ActiveButtonStyle: activeButtonStyle,
-		DialogBoxStyle:    dialogBoxStyle,
-		TextStyle:         textStyle,
+		ButtonStyle:        buttonStyle,
+		ActiveButtonStyle:  activeButtonStyle,
+		PressedButtonStyle: pressedButtonStyle,
+		DialogBoxStyle:     dialogBoxStyle,
+		TextStyle:          textStyle,
 	}
 }
