@@ -3,6 +3,7 @@ package info
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/drekunov/gc/internal/widgets/button"
 	"github.com/drekunov/gc/internal/widgets/config"
 )
 
@@ -11,14 +12,17 @@ type Model struct {
 	width   int
 	height  int
 	visible bool
+
+	okButton *button.Model
 }
 
 func New(text string, width, height int) *Model {
 	return &Model{
-		text:    text,
-		width:   width,
-		height:  height,
-		visible: true,
+		text:     text,
+		width:    width,
+		height:   height,
+		visible:  true,
+		okButton: button.New("Ok", true),
 	}
 }
 
@@ -27,6 +31,8 @@ func (m *Model) Init() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m.okButton.Update(msg)
+
 	switch msg := msg.(type) { //nolint: gocritic
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyEnter {
@@ -43,7 +49,7 @@ func (m *Model) View() string {
 	}
 
 	text := config.Values.TextStyle.Render(m.text)
-	okButton := config.Values.ActiveButtonStyle.Render("Ok")
+	okButton := m.okButton.View()
 
 	output := lipgloss.JoinVertical(lipgloss.Center, text, okButton)
 
