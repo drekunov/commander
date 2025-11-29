@@ -3,8 +3,8 @@ package mainwindow
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/drekunov/gc/internal/widgets/config"
-	"github.com/drekunov/gc/internal/widgets/info"
+	"github.com/drekunov/gc/internal/ui/config"
+	"github.com/drekunov/gc/internal/ui/widgets/info"
 )
 
 type Model struct {
@@ -15,7 +15,7 @@ type Model struct {
 
 func New() *Model {
 	return &Model{
-		about: info.New("Hello, World!", 0, 0),
+		about: info.New(),
 	}
 }
 

@@ -2,8 +2,7 @@ package button
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/drekunov/gc/internal/widgets/config"
+	"github.com/drekunov/gc/internal/ui/config"
 )
 
 type Model struct {
@@ -47,10 +46,5 @@ func (m *Model) View() string {
 		button = config.Values.PressedButtonStyle.Render(m.text)
 	}
 
-	box := lipgloss.NewStyle().
-		Border(lipgloss.BlockBorder(), false, true, true, false).
-		BorderForeground(lipgloss.Color("#111111")).
-		BorderBackground(lipgloss.Color("#111111"))
-
-	return box.Render(button)
+	return button
 }
