@@ -6,10 +6,10 @@ import (
 )
 
 type App struct {
-	ui Dialogs
+	ui UI
 }
 
-func New(ui Dialogs) *App {
+func New(ui UI) *App {
 	return &App{
 		ui: ui,
 	}

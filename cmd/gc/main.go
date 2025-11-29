@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os/signal"
 	"syscall"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drekunov/gc/internal/app"
 	"github.com/drekunov/gc/internal/ui"
 	"golang.org/x/sync/errgroup"
@@ -40,15 +42,15 @@ func Run() error {
 	errGr.Go(func() error {
 		err := appInstance.Run(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not start app: %w", err)
 		}
 
 		return nil
 	})
 
 	err := errGr.Wait()
-	if err != nil {
-		return err
+	if err != nil && !errors.Is(err, tea.ErrInterrupted) {
+		return fmt.Errorf("exiting app: %w", err)
 	}
 
 	return nil

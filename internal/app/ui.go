@@ -1,10 +1,10 @@
 package app
 
-type UI interface {
+type UI interface { //nolint: iface
 	Dialogs
 }
 
-type Dialogs interface {
+type Dialogs interface { //nolint: iface
 	ShowModal(title, message string)
 	Info(title, message string)
 	Error(title, message string)
