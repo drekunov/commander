@@ -3,11 +3,12 @@ package info
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/drekunov/gc/internal/widgets/button"
-	"github.com/drekunov/gc/internal/widgets/config"
+	"github.com/drekunov/gc/internal/ui/config"
+	"github.com/drekunov/gc/internal/ui/widgets/button"
 )
 
 type Model struct {
+	title   string
 	text    string
 	width   int
 	height  int
@@ -16,14 +17,22 @@ type Model struct {
 	okButton *button.Model
 }
 
-func New(text string, width, height int) *Model {
+func New() *Model {
 	return &Model{
-		text:     text,
-		width:    width,
-		height:   height,
-		visible:  true,
 		okButton: button.New("Ok", true),
 	}
+}
+
+func (m *Model) SetTitle(title string) {
+	m.title = title
+}
+
+func (m *Model) SetText(text string) {
+	m.text = text
+}
+
+func (m *Model) SetVisible(visible bool) {
+	m.visible = visible
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -49,6 +58,7 @@ func (m *Model) View() string {
 	}
 
 	text := config.Values.TextStyle.Render(m.text)
+
 	okButton := m.okButton.View()
 
 	output := lipgloss.JoinVertical(lipgloss.Center, text, okButton)
@@ -59,7 +69,7 @@ func (m *Model) View() string {
 		Align(lipgloss.Center, lipgloss.Center).
 		Render(output)
 
-	dialog := lipgloss.Place(
+	output = lipgloss.Place(
 		m.width,
 		m.height,
 		lipgloss.Center,
@@ -67,5 +77,5 @@ func (m *Model) View() string {
 		output,
 	)
 
-	return dialog
+	return output
 }

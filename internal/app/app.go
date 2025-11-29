@@ -1,18 +1,28 @@
 package app
 
 import (
-	"fmt"
-
-	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/drekunov/gc/internal/widgets/mainwindow"
+	"context"
+	"time"
 )
 
-func Run() error {
-	_, err := tea.NewProgram(mainwindow.New(), tea.WithMouseAllMotion()).Run()
-	if err != nil {
-		return fmt.Errorf("failed to run program: %w", err)
-	}
+type App struct {
+	ui Dialogs
+}
 
-	return nil
+func New(ui Dialogs) *App {
+	return &App{
+		ui: ui,
+	}
+}
+
+func (a *App) Run(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			time.Sleep(time.Second)
+			a.ui.Info("Hello", "World")
+		}
+	}
 }
