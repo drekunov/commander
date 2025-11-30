@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"context"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -15,14 +14,16 @@ type Model struct {
 }
 
 func New() *Model {
-	return &Model{
+	model := &Model{
 		main: mainwindow.New(),
 	}
+
+	model.program = tea.NewProgram(model, tea.WithMouseAllMotion(), tea.WithAltScreen())
+
+	return model
 }
 
-func (m *Model) Run(ctx context.Context) error {
-	m.program = tea.NewProgram(m, tea.WithContext(ctx), tea.WithMouseAllMotion())
-
+func (m *Model) Run() error {
 	_, err := m.program.Run()
 	if err != nil {
 		return fmt.Errorf("failed to run program: %w", err)
@@ -36,7 +37,23 @@ func (m *Model) Init() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return m.main.Update(msg)
+	var (
+		cmds []tea.Cmd
+		cmd  tea.Cmd
+	)
+
+	m.main, cmd = m.main.Update(msg)
+	cmds = append(cmds, cmd)
+
+	switch msg := msg.(type) { //nolint: gocritic
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+		}
+	}
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m *Model) View() string {

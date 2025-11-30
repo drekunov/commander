@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"time"
 )
 
 type App struct {
@@ -16,13 +15,9 @@ func New(ui UI) *App {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			time.Sleep(100 * time.Millisecond)
-			a.ui.Info("test header", "test footer", "Hello World!!!")
-		}
-	}
+	a.ui.Input("test header", "test footer", "Hello World!!!")
+
+	<-ctx.Done()
+
+	return nil
 }

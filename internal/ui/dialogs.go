@@ -28,9 +28,8 @@ func (m *Model) Confirm(title, message string) bool {
 	panic("implement me")
 }
 
-func (m *Model) Input(title, message string) string {
-	//TODO implement me
-	panic("implement me")
+func (m *Model) Input(title, footer, message string) string {
+	return m.main.Input(title, footer, message)
 }
 
 func (m *Model) Password(title, message string) string {

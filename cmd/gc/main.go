@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os/signal"
-	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drekunov/gc/internal/app"
@@ -22,8 +20,7 @@ func main() {
 }
 
 func Run() error {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
+	ctx := context.Background()
 
 	uiInstance := ui.New()
 	appInstance := app.New(uiInstance)
@@ -31,7 +28,7 @@ func Run() error {
 	errGr, ctx := errgroup.WithContext(ctx)
 
 	errGr.Go(func() error {
-		err := uiInstance.Run(ctx)
+		err := uiInstance.Run()
 		if err != nil {
 			return fmt.Errorf("could not start ui: %w", err)
 		}
