@@ -9,6 +9,7 @@ import (
 
 type Model struct {
 	title   string
+	footer  string
 	text    string
 	width   int
 	height  int
@@ -27,12 +28,24 @@ func (m *Model) SetTitle(title string) {
 	m.title = title
 }
 
+func (m *Model) SetFooter(footer string) {
+	m.footer = footer
+}
+
 func (m *Model) SetText(text string) {
 	m.text = text
 }
 
 func (m *Model) SetVisible(visible bool) {
 	m.visible = visible
+}
+
+func (m *Model) SetWidth(width int) {
+	m.width = width
+}
+
+func (m *Model) SetHeight(height int) {
+	m.height = height
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -57,6 +70,8 @@ func (m *Model) View() string {
 		return ""
 	}
 
+	header := m.headerView()
+
 	text := config.Values.TextStyle.Render(m.text)
 
 	okButton := m.okButton.View()
@@ -67,15 +82,47 @@ func (m *Model) View() string {
 		Width(m.width).
 		Height(m.height).
 		Align(lipgloss.Center, lipgloss.Center).
+		BorderTop(false).
+		BorderBottom(false).
 		Render(output)
 
-	output = lipgloss.Place(
-		m.width,
-		m.height,
-		lipgloss.Center,
-		lipgloss.Center,
-		output,
-	)
+	footer := m.footerView()
+
+	output = lipgloss.JoinVertical(lipgloss.Center, header, output, footer)
 
 	return output
+}
+
+func (m *Model) headerView() string {
+	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
+	header := lipgloss.PlaceHorizontal(
+		m.width,
+		lipgloss.Center,
+		" "+m.title+" ",
+		lipgloss.WithWhitespaceChars(borderStyle.Top))
+
+	header = lipgloss.JoinHorizontal(lipgloss.Center, borderStyle.TopLeft, header, borderStyle.TopRight)
+
+	header = lipgloss.NewStyle().
+		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground()).
+		Render(header)
+
+	return header
+}
+
+func (m *Model) footerView() string {
+	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
+	footer := lipgloss.PlaceHorizontal(
+		m.width,
+		lipgloss.Center,
+		" "+m.footer+" ",
+		lipgloss.WithWhitespaceChars(borderStyle.Top))
+
+	footer = lipgloss.JoinHorizontal(lipgloss.Center, borderStyle.BottomLeft, footer, borderStyle.BottomRight)
+
+	footer = lipgloss.NewStyle().
+		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground()).
+		Render(footer)
+
+	return footer
 }

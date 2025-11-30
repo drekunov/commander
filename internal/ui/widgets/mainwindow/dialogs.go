@@ -7,11 +7,14 @@ func (m *Model) ShowModal(title, message string) {
 	panic("implement me")
 }
 
-func (m *Model) Info(title, message string) {
+func (m *Model) Info(title, footer, message string) {
 	m.about = info.New()
 	m.about.SetText(message)
 	m.about.SetTitle(title)
+	m.about.SetFooter(footer)
 	m.about.SetVisible(true)
+	m.about.SetHeight(10)
+	m.about.SetWidth(80)
 }
 
 func (m *Model) Error(title, message string) {

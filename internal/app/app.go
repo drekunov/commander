@@ -21,8 +21,8 @@ func (a *App) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		default:
-			time.Sleep(time.Second)
-			a.ui.Info("Hello", "World")
+			time.Sleep(100 * time.Millisecond)
+			a.ui.Info("test header", "test footer", "Hello World!!!")
 		}
 	}
 }

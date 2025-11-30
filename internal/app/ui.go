@@ -6,7 +6,7 @@ type UI interface { //nolint: iface
 
 type Dialogs interface { //nolint: iface
 	ShowModal(title, message string)
-	Info(title, message string)
+	Info(title, footer, message string)
 	Error(title, message string)
 	Warning(title, message string)
 	Confirm(title, message string) bool

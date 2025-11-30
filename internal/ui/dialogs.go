@@ -7,8 +7,9 @@ func (m *Model) ShowModal(title, message string) {
 	panic("implement me")
 }
 
-func (m *Model) Info(title, message string) {
-	m.main.Info(title, message)
+func (m *Model) Info(title, footer, message string) {
+	m.main.Info(title, footer, message)
+
 	m.program.Send(tea.ResumeMsg{})
 }
 
