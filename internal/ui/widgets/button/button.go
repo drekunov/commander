@@ -11,18 +11,18 @@ type Model struct {
 	focused bool
 }
 
-func New(text string, focused bool) *Model {
-	return &Model{
+func New(text string, focused bool) Model {
+	return Model{
 		text:    text,
 		focused: focused,
 	}
 }
 
-func (m *Model) Init() tea.Cmd {
+func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -34,7 +34,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) View() string {
+func (m Model) View() string {
 	button := config.Values.ButtonStyle.
 		Render(m.text)
 

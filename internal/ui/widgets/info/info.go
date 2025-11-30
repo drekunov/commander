@@ -1,6 +1,7 @@
 package info
 
 import (
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/drekunov/gc/internal/ui/config"
@@ -15,12 +16,21 @@ type Model struct {
 	height  int
 	visible bool
 
-	okButton *button.Model
+	okButton button.Model
+	input    textinput.Model
 }
 
 func New() *Model {
+	input := textinput.New()
+	input.Placeholder = "Pikachu"
+	input.Focus()
+	input.CharLimit = 156
+	input.Width = 20
+	input.Prompt = ""
+
 	return &Model{
 		okButton: button.New("Ok", true),
+		input:    input,
 	}
 }
 
@@ -52,8 +62,17 @@ func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	m.okButton.Update(msg)
+func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
+	var (
+		cmds []tea.Cmd
+		cmd  tea.Cmd
+	)
+
+	m.okButton, cmd = m.okButton.Update(msg)
+	cmds = append(cmds, cmd)
+
+	m.input, cmd = m.input.Update(msg)
+	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) { //nolint: gocritic
 	case tea.KeyMsg:
@@ -62,7 +81,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	return m, nil
+	return m, tea.Batch(cmds...)
 }
 
 func (m *Model) View() string {
@@ -70,13 +89,14 @@ func (m *Model) View() string {
 		return ""
 	}
 
-	header := m.headerView()
-
 	text := config.Values.TextStyle.Render(m.text)
+
+	input := config.Values.InputStyle.
+		Render(m.input.View())
 
 	okButton := m.okButton.View()
 
-	output := lipgloss.JoinVertical(lipgloss.Center, text, okButton)
+	output := lipgloss.JoinVertical(lipgloss.Center, text, input, okButton)
 
 	output = config.Values.DialogBoxStyle.
 		Width(m.width).
@@ -86,17 +106,19 @@ func (m *Model) View() string {
 		BorderBottom(false).
 		Render(output)
 
-	footer := m.footerView()
+	header := m.headerView(lipgloss.Width(output) - 2)
+
+	footer := m.footerView(lipgloss.Width(output) - 2)
 
 	output = lipgloss.JoinVertical(lipgloss.Center, header, output, footer)
 
 	return output
 }
 
-func (m *Model) headerView() string {
+func (m *Model) headerView(width int) string {
 	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
 	header := lipgloss.PlaceHorizontal(
-		m.width,
+		width,
 		lipgloss.Center,
 		" "+m.title+" ",
 		lipgloss.WithWhitespaceChars(borderStyle.Top))
@@ -110,10 +132,10 @@ func (m *Model) headerView() string {
 	return header
 }
 
-func (m *Model) footerView() string {
+func (m *Model) footerView(width int) string {
 	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
 	footer := lipgloss.PlaceHorizontal(
-		m.width,
+		width,
 		lipgloss.Center,
 		" "+m.footer+" ",
 		lipgloss.WithWhitespaceChars(borderStyle.Top))

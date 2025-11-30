@@ -10,6 +10,7 @@ type Config struct {
 	PressedButtonStyle lipgloss.Style
 	DialogBoxStyle     lipgloss.Style
 	TextStyle          lipgloss.Style
+	InputStyle         lipgloss.Style
 }
 
 var Values Config
@@ -41,8 +42,12 @@ func init() {
 	textStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FFF7DB")).
 		Padding(0, 0).
-		MarginTop(0).
-		MarginBottom(0)
+		Margin(1, 1, 0, 1)
+
+	inputStyle := textStyle.
+		Foreground(lipgloss.Color("#874BFD")).
+		Padding(0, 0, 0, 0).
+		Margin(1, 1, 0, 1)
 
 	Values = Config{
 		ButtonStyle:        buttonStyle,
@@ -50,5 +55,6 @@ func init() {
 		PressedButtonStyle: pressedButtonStyle,
 		DialogBoxStyle:     dialogBoxStyle,
 		TextStyle:          textStyle,
+		InputStyle:         inputStyle,
 	}
 }

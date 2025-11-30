@@ -23,12 +23,13 @@ func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
+func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
+	var (
+		cmds []tea.Cmd
+		cmd  tea.Cmd
+	)
 
-	about, cmd := m.about.Update(msg)
-	m.about, _ = about.(*info.Model)
-
+	m.about, cmd = m.about.Update(msg)
 	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) { //nolint: gocritic
