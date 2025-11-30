@@ -4,7 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/drekunov/gc/internal/ui/config"
+	"github.com/drekunov/gc/internal/config"
 	"github.com/drekunov/gc/internal/ui/widgets/button"
 )
 
@@ -18,6 +18,8 @@ type Model struct {
 
 	okButton button.Model
 	input    textinput.Model
+
+	done chan struct{}
 }
 
 func New() *Model {
@@ -31,6 +33,7 @@ func New() *Model {
 	return &Model{
 		okButton: button.New("Ok", true),
 		input:    input,
+		done:     make(chan struct{}),
 	}
 }
 
@@ -58,8 +61,20 @@ func (m *Model) SetHeight(height int) {
 	m.height = height
 }
 
+func (m *Model) Input() string {
+	return m.input.Value()
+}
+
+func (m *Model) Done() chan struct{} {
+	return m.done
+}
+
 func (m *Model) Init() tea.Cmd {
 	return nil
+}
+
+func (m *Model) Free() {
+	close(m.done)
 }
 
 func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
@@ -78,6 +93,7 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyEnter {
 			m.visible = false
+			m.done <- struct{}{}
 		}
 	}
 
@@ -111,6 +127,10 @@ func (m *Model) View() string {
 	footer := m.footerView(lipgloss.Width(output) - 2)
 
 	output = lipgloss.JoinVertical(lipgloss.Center, header, output, footer)
+
+	output = lipgloss.Place(m.width, m.height, 0.1, 0.1, output)
+
+	output = lipgloss.Place(m.width, m.height, 0.2, 0.2, output)
 
 	return output
 }
