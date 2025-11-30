@@ -27,7 +27,8 @@ func init() {
 	buttonStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FFF7DB")).
 		Background(lipgloss.Color("#888B7E")).
-		Padding(0, 1, 0, 1)
+		Padding(0, 1, 0, 1).
+		Margin(1, 1, 1, 1)
 
 	activeButtonStyle := buttonStyle.
 		Foreground(lipgloss.Color("#FFF7DB")).
