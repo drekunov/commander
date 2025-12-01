@@ -1,6 +1,10 @@
 package mainwindow
 
-import "github.com/drekunov/gc/internal/ui/widgets/info"
+import (
+	"context"
+
+	"github.com/drekunov/gc/internal/ui/widgets/info"
+)
 
 func (m *Model) ShowModal(title, message string) {
 	//TODO implement me
@@ -30,14 +34,19 @@ func (m *Model) Confirm(title, message string) bool {
 	panic("implement me")
 }
 
-func (m *Model) Input(title, footer, message string) string {
+func (m *Model) Input(ctx context.Context, title, footer, message string) string {
 	m.about = info.New()
 	m.about.SetText(message)
 	m.about.SetTitle(title)
 	m.about.SetFooter(footer)
 	m.about.SetVisible(true)
 
-	return ""
+	select {
+	case <-ctx.Done():
+	case <-m.about.Done():
+	}
+
+	return m.about.Input()
 }
 
 func (m *Model) Password(title, message string) string {

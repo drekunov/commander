@@ -2,7 +2,7 @@ package button
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/drekunov/gc/internal/ui/config"
+	"github.com/drekunov/gc/internal/config"
 )
 
 type Model struct {

@@ -1,6 +1,10 @@
 package ui
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"context"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 func (m *Model) ShowModal(title, message string) {
 	//TODO implement me
@@ -28,8 +32,8 @@ func (m *Model) Confirm(title, message string) bool {
 	panic("implement me")
 }
 
-func (m *Model) Input(title, footer, message string) string {
-	return m.main.Input(title, footer, message)
+func (m *Model) Input(ctx context.Context, title, footer, message string) string {
+	return m.main.Input(ctx, title, footer, message)
 }
 
 func (m *Model) Password(title, message string) string {

@@ -47,8 +47,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) { //nolint: gocritic
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
+		if msg.Type == tea.KeyF10 {
 			return m, tea.Quit
 		}
 	}

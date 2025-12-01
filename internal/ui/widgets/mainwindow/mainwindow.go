@@ -3,7 +3,7 @@ package mainwindow
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/drekunov/gc/internal/ui/config"
+	"github.com/drekunov/gc/internal/config"
 	"github.com/drekunov/gc/internal/ui/widgets/info"
 )
 
@@ -34,8 +34,9 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 	switch msg := msg.(type) { //nolint: gocritic
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
+		if msg.Type == tea.KeyF10 {
+			m.about.Free()
+
 			return m, tea.Quit
 		}
 	case tea.WindowSizeMsg:
@@ -48,7 +49,7 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 func (m *Model) View() string {
 	about := m.about.View()
-	exit := lipgloss.PlaceHorizontal(0, lipgloss.Center, "Press q to quit.")
+	exit := lipgloss.PlaceHorizontal(0, lipgloss.Center, "Press F10 to quit.")
 	out := lipgloss.JoinVertical(lipgloss.Center, about, exit)
 	out = config.Values.DialogBoxStyle.
 		Width(m.width).
