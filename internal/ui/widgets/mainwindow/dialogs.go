@@ -3,63 +3,69 @@ package mainwindow
 import (
 	"context"
 
-	"github.com/drekunov/gc/internal/ui/widgets/info"
+	"github.com/drekunov/gc/internal/ui/widgets/dialogs"
 )
 
-func (m *Model) ShowModal(title, message string) {
-	//TODO implement me
-	panic("implement me")
-}
+func (m *Model) Info(ctx context.Context, title, footer, message string) {
+	about := dialogs.NewInfo()
+	about.SetText(message)
+	about.SetTitle(title)
+	about.SetFooter(footer)
+	about.SetVisible(true)
 
-func (m *Model) Info(title, footer, message string) {
-	m.about = info.New()
-	m.about.SetText(message)
-	m.about.SetTitle(title)
-	m.about.SetFooter(footer)
-	m.about.SetVisible(true)
-}
-
-func (m *Model) Error(title, message string) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m *Model) Warning(title, message string) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m *Model) Confirm(title, message string) bool {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m *Model) Input(ctx context.Context, title, footer, message string) string {
-	m.about = info.New()
-	m.about.SetText(message)
-	m.about.SetTitle(title)
-	m.about.SetFooter(footer)
-	m.about.SetVisible(true)
+	id := m.addWindow(about)
+	defer m.removeWindow(id)
 
 	select {
 	case <-ctx.Done():
-	case <-m.about.Done():
+	case <-about.Done():
+	}
+}
+
+func (m *Model) Input(ctx context.Context, title, footer, message string) string {
+	input := dialogs.NewInput()
+	input.SetText(message)
+	input.SetTitle(title)
+	input.SetFooter(footer)
+	input.SetVisible(true)
+
+	id := m.addWindow(input)
+	defer m.removeWindow(id)
+
+	select {
+	case <-ctx.Done():
+	case <-input.Done():
 	}
 
-	return m.about.Input()
+	return input.Input()
 }
 
 func (m *Model) Password(title, message string) string {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (m *Model) Select(title, message string, options []string) string {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (m *Model) SelectMultiple(title, message string, options []string) []string {
-	//TODO implement me
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m *Model) Error(title, message string) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m *Model) Warning(title, message string) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m *Model) Confirm(title, message string) bool {
+	// TODO implement me
 	panic("implement me")
 }

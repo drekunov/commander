@@ -1,14 +1,13 @@
-package info
+package dialogs
 
 import (
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/drekunov/gc/internal/config"
 	"github.com/drekunov/gc/internal/ui/widgets/button"
 )
 
-type Model struct {
+type Info struct {
 	title   string
 	footer  string
 	text    string
@@ -17,76 +16,60 @@ type Model struct {
 	visible bool
 
 	okButton button.Model
-	input    textinput.Model
 
 	done chan struct{}
 }
 
-func New() *Model {
-	input := textinput.New()
-	input.Placeholder = "Pikachu"
-	input.Focus()
-	input.CharLimit = 156
-	input.Width = 20
-	input.Prompt = ""
-
-	return &Model{
+func NewInfo() *Info {
+	return &Info{
 		okButton: button.New("Ok", true),
-		input:    input,
 		done:     make(chan struct{}),
 	}
 }
 
-func (m *Model) SetTitle(title string) {
+func (m *Info) SetTitle(title string) {
 	m.title = title
 }
 
-func (m *Model) SetFooter(footer string) {
+func (m *Info) SetFooter(footer string) {
 	m.footer = footer
 }
 
-func (m *Model) SetText(text string) {
+func (m *Info) SetText(text string) {
 	m.text = text
 }
 
-func (m *Model) SetVisible(visible bool) {
+func (m *Info) SetVisible(visible bool) {
 	m.visible = visible
 }
 
-func (m *Model) SetWidth(width int) {
+func (m *Info) SetWidth(width int) {
 	m.width = width
 }
 
-func (m *Model) SetHeight(height int) {
+func (m *Info) SetHeight(height int) {
 	m.height = height
 }
 
-func (m *Model) Input() string {
-	return m.input.Value()
-}
-
-func (m *Model) Done() chan struct{} {
+func (m *Info) Done() chan struct{} {
 	return m.done
 }
 
-func (m *Model) Init() tea.Cmd {
+func (m *Info) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Model) Free() {
+func (m *Info) Free() {
 	close(m.done)
 }
 
-func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
+func (m *Info) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmds []tea.Cmd
 		cmd  tea.Cmd
 	)
 
 	m.okButton, cmd = m.okButton.Update(msg)
-	cmds = append(cmds, cmd)
-
-	m.input, cmd = m.input.Update(msg)
 	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) { //nolint: gocritic
@@ -100,19 +83,16 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *Model) View() string {
+func (m *Info) View() string {
 	if !m.visible {
 		return ""
 	}
 
 	text := config.Values.TextStyle.Render(m.text)
 
-	input := config.Values.InputStyle.
-		Render(m.input.View())
-
 	okButton := m.okButton.View()
 
-	output := lipgloss.JoinVertical(lipgloss.Center, text, input, okButton)
+	output := lipgloss.JoinVertical(lipgloss.Center, text, okButton)
 
 	output = config.Values.DialogBoxStyle.
 		Width(m.width).
@@ -135,7 +115,7 @@ func (m *Model) View() string {
 	return output
 }
 
-func (m *Model) headerView(width int) string {
+func (m *Info) headerView(width int) string {
 	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
 	header := lipgloss.PlaceHorizontal(
 		width,
@@ -152,7 +132,7 @@ func (m *Model) headerView(width int) string {
 	return header
 }
 
-func (m *Model) footerView(width int) string {
+func (m *Info) footerView(width int) string {
 	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
 	footer := lipgloss.PlaceHorizontal(
 		width,
