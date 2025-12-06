@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drekunov/gc/internal/app"
+	"github.com/drekunov/gc/internal/connectors/filesystem"
 	"github.com/drekunov/gc/internal/ui"
 	"golang.org/x/sync/errgroup"
 )
@@ -22,8 +23,10 @@ func main() {
 func Run() error {
 	ctx := context.Background()
 
+	fsConn := filesystem.New()
+
 	uiInstance := ui.New()
-	appInstance := app.New(uiInstance)
+	appInstance := app.New(uiInstance, fsConn)
 
 	errGr, ctx := errgroup.WithContext(ctx)
 

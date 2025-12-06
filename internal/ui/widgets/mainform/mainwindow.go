@@ -1,20 +1,23 @@
-package mainwindow
+package mainform
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/drekunov/gc/internal/config"
+	"github.com/drekunov/gc/internal/ui/widgets/panel"
 )
 
 type Model struct {
 	width, height int
 
+	panel   panel.Model
 	windows windowsList
 }
 
 func New() *Model {
 	return &Model{
 		windows: make(windowsList),
+		panel:   panel.NewPanel(),
 	}
 }
 
@@ -29,6 +32,9 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	)
 
 	m.windows, cmd = m.windows.Update(msg)
+	cmds = append(cmds, cmd)
+
+	m.panel, cmd = m.panel.Update(msg)
 	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) { //nolint: gocritic
@@ -47,8 +53,10 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 func (m *Model) View() string {
 	windows := m.windows.View()
 
-	exit := lipgloss.PlaceHorizontal(0, lipgloss.Center, "Press F10 to quit.")
-	out := lipgloss.JoinVertical(lipgloss.Center, windows, exit)
+	panelView := m.panel.View()
+
+	out := lipgloss.JoinVertical(lipgloss.Center, panelView, windows)
+
 	out = config.Values.DialogBoxStyle.
 		Width(m.width).
 		Height(m.height).
@@ -56,4 +64,28 @@ func (m *Model) View() string {
 		Render(out)
 
 	return out
+}
+
+func (m *Model) SetWidth(width int) {
+	m.width = width
+}
+
+func (m *Model) SetHeight(height int) {
+	m.height = height
+}
+
+func (m *Model) SetPanel(panel panel.Model) {
+	m.panel = panel
+}
+
+func (m *Model) Panel() panel.Model {
+	return m.panel
+}
+
+func (m *Model) Width() int {
+	return m.width
+}
+
+func (m *Model) Height() int {
+	return m.height
 }

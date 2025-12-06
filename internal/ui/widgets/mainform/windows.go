@@ -1,4 +1,4 @@
-package mainwindow
+package mainform
 
 import (
 	"time"
@@ -8,8 +8,8 @@ import (
 )
 
 type (
-	windowID    int64
-	windowsList map[windowID]tea.Model
+	WindowID    int64
+	windowsList map[WindowID]tea.Model
 )
 
 func (w windowsList) Init() tea.Cmd {
@@ -17,10 +17,9 @@ func (w windowsList) Init() tea.Cmd {
 }
 
 func (w windowsList) Update(msg tea.Msg) (windowsList, tea.Cmd) {
-	var (
-		cmds []tea.Cmd
-		cmd  tea.Cmd
-	)
+	var cmd tea.Cmd
+
+	cmds := make([]tea.Cmd, 0, len(w))
 
 	for id, model := range w {
 		w[id], cmd = model.Update(msg)
@@ -31,7 +30,7 @@ func (w windowsList) Update(msg tea.Msg) (windowsList, tea.Cmd) {
 }
 
 func (w windowsList) View() string {
-	var views []string
+	views := make([]string, 0, len(w))
 
 	for _, model := range w {
 		views = append(views, model.View())
@@ -40,17 +39,17 @@ func (w windowsList) View() string {
 	return lipgloss.JoinVertical(lipgloss.Center, views...)
 }
 
-func (m *Model) addWindow(w tea.Model) windowID {
+func (m *Model) AddWindow(w tea.Model) WindowID {
 	wid := newWindowID()
 	m.windows[wid] = w
 
 	return wid
 }
 
-func (m *Model) removeWindow(id windowID) {
+func (m *Model) RemoveWindow(id WindowID) {
 	delete(m.windows, id)
 }
 
-func newWindowID() windowID {
-	return windowID(time.Now().UnixNano())
+func newWindowID() WindowID {
+	return WindowID(time.Now().UnixNano())
 }
