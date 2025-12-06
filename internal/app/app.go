@@ -17,12 +17,15 @@ func New(ui UI) *App {
 func (a *App) Run(ctx context.Context) error {
 	msg := "Hello World!!!"
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			msg = a.ui.Input(ctx, "test header", "test footer", msg)
-		}
-	}
+	go func() {
+		a.ui.Info(ctx, "Hello", "footer", msg)
+	}()
+
+	go func() {
+		msg = a.ui.Input(ctx, "test header", "test footer", msg)
+	}()
+
+	<-ctx.Done()
+
+	return nil
 }
