@@ -4,18 +4,18 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/drekunov/gc/internal/ui/widgets/mainwindow"
+	"github.com/drekunov/gc/internal/ui/widgets/mainform"
 )
 
 type Model struct {
 	program *tea.Program
 
-	main *mainwindow.Model
+	main *mainform.Model
 }
 
 func New() *Model {
 	model := &Model{
-		main: mainwindow.New(),
+		main: mainform.New(),
 	}
 
 	model.program = tea.NewProgram(model, tea.WithMouseAllMotion(), tea.WithAltScreen())

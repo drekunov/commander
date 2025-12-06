@@ -2,28 +2,33 @@ package app
 
 import (
 	"context"
+	"fmt"
 )
 
 type App struct {
 	ui UI
+
+	connector Connector
 }
 
-func New(ui UI) *App {
+func New(ui UI, conn Connector) *App {
 	return &App{
-		ui: ui,
+		ui:        ui,
+		connector: conn,
 	}
 }
 
 func (a *App) Run(ctx context.Context) error {
-	msg := "Hello World!!!"
+	a.ui.Info(ctx, a.connector.Name(), "/", "Connecting to "+a.connector.Name()+"...")
 
-	go func() {
-		a.ui.Info(ctx, "Hello", "footer", msg)
-	}()
+	data, err := a.connector.ReadDir("/")
+	if err != nil {
+		a.ui.Info(ctx, a.connector.Name(), "/", err.Error())
 
-	go func() {
-		msg = a.ui.Input(ctx, "test header", "test footer", msg)
-	}()
+		return fmt.Errorf("error reading directory: %w", err)
+	}
+
+	a.ui.SetData(data)
 
 	<-ctx.Done()
 

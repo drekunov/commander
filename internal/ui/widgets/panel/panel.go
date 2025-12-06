@@ -1,78 +1,60 @@
-package dialogs
+package panel
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/drekunov/gc/internal/config"
-	"github.com/drekunov/gc/internal/ui/widgets/button"
+	"github.com/evertras/bubble-table/table"
 )
 
-type Info struct {
+type Model struct {
 	title   string
 	footer  string
-	text    string
 	width   int
 	height  int
 	visible bool
 
-	okButton button.Model
-
-	done chan struct{}
+	tableView table.Model
 }
 
-func NewInfo() *Info {
-	return &Info{
-		okButton: button.New("Ok", true),
-		done:     make(chan struct{}),
+func NewPanel() Model {
+	tableView := table.New(nil)
+
+	return Model{
+		tableView: tableView,
 	}
 }
 
-func (m *Info) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Info) Free() {
-	close(m.done)
-}
-
-func (m *Info) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var (
 		cmds []tea.Cmd
 		cmd  tea.Cmd
 	)
 
-	m.okButton, cmd = m.okButton.Update(msg)
+	m.tableView, cmd = m.tableView.Update(msg)
 	cmds = append(cmds, cmd)
 
-	switch msg := msg.(type) { //nolint: gocritic
-	case tea.KeyMsg:
-		if msg.Type == tea.KeyEnter {
-			m.visible = false
-			m.done <- struct{}{}
-		}
-	}
-
-	return m, tea.Batch(cmds...)
+	return *m, tea.Batch(cmds...)
 }
 
-func (m *Info) View() string {
+func (m *Model) View() string {
 	if !m.visible {
 		return ""
 	}
 
-	text := config.Values.TextStyle.Render(m.text)
+	tableView := config.Values.TextStyle.Render(m.tableView.View())
 
-	okButton := m.okButton.View()
-
-	output := lipgloss.JoinVertical(lipgloss.Center, text, okButton)
-
-	output = config.Values.DialogBoxStyle.
+	output := config.Values.DialogBoxStyle.
 		Width(m.width).
 		Height(m.height).
 		Align(lipgloss.Center, lipgloss.Center).
 		BorderTop(false).
 		BorderBottom(false).
-		Render(output)
+		Render(tableView)
 
 	header := m.headerView(lipgloss.Width(output) - 2)
 
@@ -80,42 +62,38 @@ func (m *Info) View() string {
 
 	output = lipgloss.JoinVertical(lipgloss.Center, header, output, footer)
 
-	output = lipgloss.Place(m.width, m.height, 0.1, 0.1, output)
-
-	output = lipgloss.Place(m.width, m.height, 0.2, 0.2, output)
-
 	return output
 }
 
-func (m *Info) SetTitle(title string) {
+func (m *Model) SetTitle(title string) {
 	m.title = title
 }
 
-func (m *Info) SetFooter(footer string) {
+func (m *Model) SetFooter(footer string) {
 	m.footer = footer
 }
 
-func (m *Info) SetText(text string) {
-	m.text = text
+func (m *Model) TableView() table.Model {
+	return m.tableView
 }
 
-func (m *Info) SetVisible(visible bool) {
+func (m *Model) SetVisible(visible bool) {
 	m.visible = visible
 }
 
-func (m *Info) SetWidth(width int) {
+func (m *Model) SetWidth(width int) {
 	m.width = width
 }
 
-func (m *Info) SetHeight(height int) {
+func (m *Model) SetHeight(height int) {
 	m.height = height
 }
 
-func (m *Info) Done() chan struct{} {
-	return m.done
+func (m *Model) SetTableView(tableView table.Model) {
+	m.tableView = tableView
 }
 
-func (m *Info) headerView(width int) string {
+func (m *Model) headerView(width int) string {
 	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
 	header := lipgloss.PlaceHorizontal(
 		width,
@@ -132,7 +110,7 @@ func (m *Info) headerView(width int) string {
 	return header
 }
 
-func (m *Info) footerView(width int) string {
+func (m *Model) footerView(width int) string {
 	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
 	footer := lipgloss.PlaceHorizontal(
 		width,

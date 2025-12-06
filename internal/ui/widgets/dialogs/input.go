@@ -37,38 +37,6 @@ func NewInput() *Input {
 	}
 }
 
-func (m *Input) SetTitle(title string) {
-	m.title = title
-}
-
-func (m *Input) SetFooter(footer string) {
-	m.footer = footer
-}
-
-func (m *Input) SetText(text string) {
-	m.text = text
-}
-
-func (m *Input) SetVisible(visible bool) {
-	m.visible = visible
-}
-
-func (m *Input) SetWidth(width int) {
-	m.width = width
-}
-
-func (m *Input) SetHeight(height int) {
-	m.height = height
-}
-
-func (m *Input) Input() string {
-	return m.input.Value()
-}
-
-func (m *Input) Done() chan struct{} {
-	return m.done
-}
-
 func (m *Input) Init() tea.Cmd {
 	return nil
 }
@@ -133,6 +101,38 @@ func (m *Input) View() string {
 	output = lipgloss.Place(m.width, m.height, 0.2, 0.2, output)
 
 	return output
+}
+
+func (m *Input) SetTitle(title string) {
+	m.title = title
+}
+
+func (m *Input) SetFooter(footer string) {
+	m.footer = footer
+}
+
+func (m *Input) SetText(text string) {
+	m.text = text
+}
+
+func (m *Input) SetVisible(visible bool) {
+	m.visible = visible
+}
+
+func (m *Input) SetWidth(width int) {
+	m.width = width
+}
+
+func (m *Input) SetHeight(height int) {
+	m.height = height
+}
+
+func (m *Input) Input() string {
+	return m.input.Value()
+}
+
+func (m *Input) Done() chan struct{} {
+	return m.done
 }
 
 func (m *Input) headerView(width int) string {
