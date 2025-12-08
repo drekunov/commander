@@ -22,7 +22,7 @@ func New() *Model {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return nil
+	return m.panel.Init()
 }
 
 func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
@@ -52,6 +52,9 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 func (m *Model) View() string {
 	windows := m.windows.View()
+
+	m.panel.SetWidth(m.width)
+	m.panel.SetHeight(m.height)
 
 	panelView := m.panel.View()
 

@@ -1,10 +1,10 @@
 package panel
 
 import (
+	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/drekunov/gc/internal/config"
-	"github.com/evertras/bubble-table/table"
 )
 
 type Model struct {
@@ -18,7 +18,9 @@ type Model struct {
 }
 
 func NewPanel() Model {
-	tableView := table.New(nil)
+	tableView := table.New(
+		table.WithFocused(true),
+	)
 
 	return Model{
 		tableView: tableView,
@@ -46,11 +48,14 @@ func (m *Model) View() string {
 		return ""
 	}
 
-	tableView := config.Values.TextStyle.Render(m.tableView.View())
+	m.tableView.SetWidth(m.width - 10)
+	m.tableView.SetHeight(m.height - 10)
+
+	tableView := config.Values.TableStyle.Render(m.tableView.View())
 
 	output := config.Values.DialogBoxStyle.
-		Width(m.width).
-		Height(m.height).
+		Width(m.width-4).
+		Height(m.height-4).
 		Align(lipgloss.Center, lipgloss.Center).
 		BorderTop(false).
 		BorderBottom(false).

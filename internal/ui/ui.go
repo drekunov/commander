@@ -33,7 +33,7 @@ func (m *Model) Run() error {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return nil
+	return m.main.Init()
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
