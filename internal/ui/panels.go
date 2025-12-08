@@ -1,19 +1,20 @@
 package ui
 
 import (
+	"fmt"
+
+	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drekunov/gc/internal/app"
-	"github.com/drekunov/gc/internal/config"
-	"github.com/evertras/bubble-table/table"
 )
 
 func rowFromAttrList(attrList app.AttributeList) table.Row {
-	rawData := make(table.RowData, len(attrList))
-	for key, attr := range attrList {
-		rawData[key.String()] = attr
+	rawData := make(table.Row, 0, len(attrList))
+	for _, attr := range attrList {
+		rawData = append(rawData, fmt.Sprintf("%v", attr.AttrValue))
 	}
 
-	return table.NewRow(rawData)
+	return rawData
 }
 
 func (m *Model) SetData(data []app.AttributeList) {
@@ -28,21 +29,24 @@ func (m *Model) SetData(data []app.AttributeList) {
 	header := data[0]
 
 	cols := make([]table.Column, 0, len(header))
-	for key := range header {
-		cols = append(cols, table.NewColumn(key.String(), key.String(), 1))
+	for _, attr := range header {
+		cols = append(
+			cols,
+			table.Column{
+				Title: attr.AttrName,
+				Width: 12,
+			},
+		)
 	}
 
-	view = view.WithColumns(cols)
+	view.SetColumns(cols)
 
 	rows := make([]table.Row, 0, len(data))
 	for _, row := range data {
 		rows = append(rows, rowFromAttrList(row))
 	}
 
-	view = view.WithRows(rows).BorderRounded().
-		WithBaseStyle(config.Values.DialogBoxStyle).
-		WithPageSize(10).
-		Focused(true)
+	view.SetRows(rows)
 
 	panel.SetTableView(view)
 	m.main.SetPanel(panel)

@@ -11,6 +11,7 @@ type Config struct {
 	DialogBoxStyle     lipgloss.Style
 	TextStyle          lipgloss.Style
 	InputStyle         lipgloss.Style
+	TableStyle         lipgloss.Style
 }
 
 var Values Config
@@ -49,6 +50,11 @@ func init() {
 		Padding(0, 0, 0, 0).
 		Margin(1, 1, 0, 1)
 
+	tableStyle := dialogBoxStyle.
+		Border(lipgloss.HiddenBorder(), false).
+		Padding(0, 1, 0, 1).
+		Margin(0, 0, 0, 0)
+
 	Values = Config{
 		ButtonStyle:        buttonStyle,
 		ActiveButtonStyle:  activeButtonStyle,
@@ -56,5 +62,6 @@ func init() {
 		DialogBoxStyle:     dialogBoxStyle,
 		TextStyle:          textStyle,
 		InputStyle:         inputStyle,
+		TableStyle:         tableStyle,
 	}
 }

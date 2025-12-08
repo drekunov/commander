@@ -19,8 +19,6 @@ func New(ui UI, conn Connector) *App {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	a.ui.Info(ctx, a.connector.Name(), "/", "Connecting to "+a.connector.Name()+"...")
-
 	data, err := a.connector.ReadDir("/")
 	if err != nil {
 		a.ui.Info(ctx, a.connector.Name(), "/", err.Error())
