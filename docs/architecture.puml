@@ -1,0 +1,275 @@
+@startuml gc-architecture
+!theme plain
+skinparam linetype ortho
+skinparam packageStyle rectangle
+
+title GC File Manager - Architecture Diagram
+
+' ============================================
+' LAYER 1: ENTRY POINT
+' ============================================
+package "cmd/gc" as entry <<Entry Point>> #LightBlue {
+    class main {
+        +main()
+        +Run() error
+    }
+}
+
+' ============================================
+' LAYER 2: APPLICATION LOGIC
+' ============================================
+package "internal/app" as app <<Application Layer>> #LightGreen {
+    interface UI {
+        {abstract} Dialog
+        {abstract} Panel
+    }
+
+    interface Dialog {
+        +Info(ctx, title, footer, message)
+        +Error(title, message)
+        +Warning(title, message)
+        +Confirm(title, message) bool
+        +Input(ctx, title, footer, message) string
+        +Password(title, message) string
+        +Select(title, message, options) string
+        +SelectMultiple(title, message, options) []string
+    }
+
+    interface Panel {
+        +SetData(data []AttributeList)
+    }
+
+    interface Connector {
+        +Name() string
+        +ReadDir(path) ([]AttributeList, error)
+        +ReadFile(path) ([]byte, error)
+    }
+
+    class App {
+        -ui: UI
+        -connector: Connector
+        +New(ui, connector) *App
+        +Run(ctx) error
+    }
+
+    class Attribute {
+        +Name: string
+        +Value: any
+    }
+
+    class AttributeList <<alias>> {
+        []Attribute
+    }
+
+    UI --|> Dialog
+    UI --|> Panel
+    App --> UI : uses
+    App --> Connector : uses
+    Connector ..> AttributeList : returns
+}
+
+' ============================================
+' LAYER 3: TERMINAL UI
+' ============================================
+package "internal/ui" as ui <<Presentation Layer>> #LightYellow {
+    class Model <<tea.Model>> {
+        -program: *tea.Program
+        -mainform: *mainform.Model
+        +New() *Model
+        +Run(ctx) error
+        +SetData(data []AttributeList)
+        +Info(ctx, title, footer, message)
+        +Error(title, message)
+        +Input(ctx, title, footer, message) string
+        ---
+        +Init() tea.Cmd
+        +Update(msg) (tea.Model, tea.Cmd)
+        +View() string
+    }
+}
+
+' ============================================
+' WIDGETS
+' ============================================
+package "internal/ui/widgets" as widgets <<UI Components>> #LightPink {
+    package "mainform" {
+        class "mainform.Model" as MainformModel <<tea.Model>> {
+            -panel: *panel.Model
+            -windows: windowsList
+            -width: int
+            -height: int
+            +New() *Model
+            +AddWindow(w tea.Model) WindowID
+            +RemoveWindow(id WindowID)
+            ---
+            +Init() tea.Cmd
+            +Update(msg) (tea.Model, tea.Cmd)
+            +View() string
+        }
+
+        class windowsList <<map>> {
+            map[WindowID]tea.Model
+            +Update(msg) tea.Cmd
+            +View() string
+        }
+
+        class WindowID <<int64>> {
+        }
+    }
+
+    package "panel" {
+        class "panel.Model" as PanelModel <<tea.Model>> {
+            -table: table.Model
+            -header: string
+            -footer: string
+            +New() *Model
+            +SetTableView(columns, rows)
+            +SetHeader(text)
+            +SetFooter(text)
+            ---
+            +Init() tea.Cmd
+            +Update(msg) (tea.Model, tea.Cmd)
+            +View() string
+        }
+    }
+
+    package "dialogs" {
+        class Info <<tea.Model>> {
+            -title: string
+            -footer: string
+            -text: string
+            -button: *button.Model
+            -done: chan struct{}
+            -visible: bool
+            +NewInfo() *Info
+            +Done() <-chan struct{}
+            +SetVisible(v bool)
+            ---
+            +Init() tea.Cmd
+            +Update(msg) (tea.Model, tea.Cmd)
+            +View() string
+        }
+
+        class Input <<tea.Model>> {
+            -title: string
+            -footer: string
+            -text: string
+            -input: textinput.Model
+            -button: *button.Model
+            -done: chan struct{}
+            -value: string
+            +NewInput() *Input
+            +Done() <-chan struct{}
+            +Value() string
+            ---
+            +Init() tea.Cmd
+            +Update(msg) (tea.Model, tea.Cmd)
+            +View() string
+        }
+    }
+
+    package "button" {
+        class "button.Model" as ButtonModel <<tea.Model>> {
+            -label: string
+            -focused: bool
+            +New(label) *Model
+            +SetFocused(f bool)
+            ---
+            +Init() tea.Cmd
+            +Update(msg) (tea.Model, tea.Cmd)
+            +View() string
+        }
+    }
+
+    MainformModel *-- PanelModel : contains
+    MainformModel *-- windowsList : manages
+    windowsList o-- Info : stores
+    windowsList o-- Input : stores
+    Info *-- ButtonModel : contains
+    Input *-- ButtonModel : contains
+}
+
+' ============================================
+' CONNECTORS
+' ============================================
+package "internal/connectors" as connectors <<Data Layer>> #LightCoral {
+    package "filesystem" {
+        class FileSystem {
+            +New() *FileSystem
+            +Name() string
+            +ReadDir(path) ([]AttributeList, error)
+            +ReadFile(path) ([]byte, error)
+        }
+    }
+}
+
+' ============================================
+' CONFIG
+' ============================================
+package "internal/config" as config <<Configuration>> #LightGray {
+    class Config {
+        +Buttons: ButtonStyles
+        +Dialogs: DialogStyles
+        +Table: TableStyles
+        +Text: TextStyles
+        +Input: InputStyles
+    }
+
+    class Values <<global>> {
+        Config instance
+    }
+}
+
+' ============================================
+' RELATIONSHIPS
+' ============================================
+' Entry point creates instances
+main ..> Model : creates
+main ..> FileSystem : creates
+main ..> App : creates
+
+' Interface implementations
+Model ..|> UI : implements
+FileSystem ..|> Connector : implements
+
+' UI internal composition
+Model *-- MainformModel : delegates to
+
+' All components use config
+Model ..> Values : uses
+MainformModel ..> Values : uses
+PanelModel ..> Values : uses
+Info ..> Values : uses
+Input ..> Values : uses
+ButtonModel ..> Values : uses
+
+' ============================================
+' NOTES
+' ============================================
+note right of entry
+  **Layer 1: Entry Point**
+  Bootstraps application,
+  creates instances,
+  runs concurrent goroutines
+end note
+
+note right of app
+  **Layer 2: Application Logic**
+  Defines interfaces,
+  orchestrates data flow,
+  universal data format
+end note
+
+note right of ui
+  **Layer 3: Presentation**
+  Bubble Tea MVU pattern,
+  wraps tea.Program
+end note
+
+note bottom of connectors
+  **Data Sources**
+  Pluggable adapters
+  (filesystem, future: remote, archives)
+end note
+
+@enduml
