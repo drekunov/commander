@@ -10,14 +10,12 @@ import (
 type Model struct {
 	width, height int
 
-	panel   panel.Model
-	windows windowsList
+	panel panel.Model
 }
 
 func New() *Model {
 	return &Model{
-		windows: make(windowsList),
-		panel:   panel.NewPanel(),
+		panel: panel.NewPanel(),
 	}
 }
 
@@ -30,9 +28,6 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		cmds []tea.Cmd
 		cmd  tea.Cmd
 	)
-
-	m.windows, cmd = m.windows.Update(msg)
-	cmds = append(cmds, cmd)
 
 	m.panel, cmd = m.panel.Update(msg)
 	cmds = append(cmds, cmd)
@@ -51,20 +46,16 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	windows := m.windows.View()
-
 	m.panel.SetWidth(m.width)
 	m.panel.SetHeight(m.height)
 
 	panelView := m.panel.View()
 
-	out := lipgloss.JoinVertical(lipgloss.Center, panelView, windows)
-
-	out = config.Values.DialogBoxStyle.
+	out := config.Values.DialogBoxStyle.
 		Width(m.width).
 		Height(m.height).
 		Align(lipgloss.Center, lipgloss.Center).
-		Render(out)
+		Render(panelView)
 
 	return out
 }

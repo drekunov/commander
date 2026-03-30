@@ -1,0 +1,49 @@
+/* Norton Commander classic theme */
+
+.button {
+    color: #000000;
+    background-color: #00AAAA;
+    padding: 0 1 0 1;
+    margin: 0 1 0 1;
+}
+
+.active-button {
+    color: #FFFFFF;
+    background-color: #000080;
+    padding: 0 1 0 1;
+    margin: 0 1 0 1;
+    text-decoration: underline;
+}
+
+.pressed-button {
+    color: #FFFF00;
+    background-color: #000080;
+    padding: 0 1 0 1;
+    margin: 0 1 0 1;
+}
+
+.dialog-box {
+    border-style: double;
+    border-color: #00AAAA;
+    padding: 0 1 0 1;
+    background-color: #000080;
+}
+
+.text {
+    color: #00AAAA;
+    padding: 0 0;
+    margin: 0 1 0 1;
+}
+
+.input {
+    color: #FFFF00;
+    padding: 0 0 0 0;
+    margin: 0 1 0 1;
+}
+
+.table {
+    border-style: hidden;
+    padding: 0 1 0 1;
+    margin: 0 0 0 0;
+    background-color: #000080;
+}

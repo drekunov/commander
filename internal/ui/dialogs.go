@@ -14,8 +14,8 @@ func (m *Model) Info(ctx context.Context, title, footer, message string) {
 	about.SetFooter(footer)
 	about.SetVisible(true)
 
-	id := m.main.AddWindow(about)
-	defer m.main.RemoveWindow(id)
+	id := m.addDialogWindow(about, title)
+	defer m.wm.Remove(id)
 
 	select {
 	case <-ctx.Done():
@@ -32,8 +32,8 @@ func (m *Model) Input(ctx context.Context, title, footer, message string) string
 	input.SetFooter(footer)
 	input.SetVisible(true)
 
-	id := m.main.AddWindow(input)
-	defer m.main.RemoveWindow(id)
+	id := m.addDialogWindow(input, title)
+	defer m.wm.Remove(id)
 
 	m.program.Send(tea.ResumeMsg{})
 
@@ -73,4 +73,15 @@ func (m *Model) Warning(title, message string) {
 func (m *Model) Confirm(title, message string) bool {
 	// TODO implement me
 	panic("implement me")
+}
+
+// addDialogWindow adds a tea.Model as a centered dialog window via the wm.
+func (m *Model) addDialogWindow(w tea.Model, title string) int {
+	width := m.wm.Width()
+	height := m.wm.Height()
+	winW := width / 2
+	winH := height / 2
+	x := (width - winW) / 2
+	y := (height - winH) / 2
+	return m.wm.Add(w, title, x, y, winW, winH)
 }
