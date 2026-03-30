@@ -23,20 +23,22 @@ type Config struct {
 var Values Config
 
 func init() {
-	css := defaultCSS
-	if data, err := os.ReadFile("styles.css"); err == nil {
-		css = string(data)
+	cssData := defaultCSS
+
+	data, err := os.ReadFile("styles.css")
+	if err == nil {
+		cssData = string(data)
 	}
 
-	ss := ParseCSS(css)
+	stylesheet := ParseCSS(cssData)
 
 	Values = Config{
-		ButtonStyle:        ApplyStyle(ss[".button"]),
-		ActiveButtonStyle:  ApplyStyle(ss[".active-button"]),
-		PressedButtonStyle: ApplyStyle(ss[".pressed-button"]),
-		DialogBoxStyle:     ApplyStyle(ss[".dialog-box"]),
-		TextStyle:          ApplyStyle(ss[".text"]),
-		InputStyle:         ApplyStyle(ss[".input"]),
-		TableStyle:         ApplyStyle(ss[".table"]),
+		ButtonStyle:        ApplyStyle(stylesheet[".button"]),
+		ActiveButtonStyle:  ApplyStyle(stylesheet[".active-button"]),
+		PressedButtonStyle: ApplyStyle(stylesheet[".pressed-button"]),
+		DialogBoxStyle:     ApplyStyle(stylesheet[".dialog-box"]),
+		TextStyle:          ApplyStyle(stylesheet[".text"]),
+		InputStyle:         ApplyStyle(stylesheet[".input"]),
+		TableStyle:         ApplyStyle(stylesheet[".table"]),
 	}
 }

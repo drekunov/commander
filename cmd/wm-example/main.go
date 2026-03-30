@@ -24,56 +24,67 @@ func newNotepad(title string, text string) *notepad {
 	if len(lines) == 0 {
 		lines = []string{""}
 	}
+
 	return &notepad{title: title, lines: lines}
 }
 
 func (n *notepad) Init() tea.Cmd { return nil }
 
 func (n *notepad) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
+	switch msg := msg.(type) { //nolint: gocritic
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyUp:
-			if n.cur > 0 {
-				n.cur--
-			}
-		case tea.KeyDown:
-			if n.cur < len(n.lines)-1 {
-				n.cur++
-			}
-		case tea.KeyEnter:
-			n.lines = append(n.lines[:n.cur+1], append([]string{""}, n.lines[n.cur+1:]...)...)
-			n.cur++
-		case tea.KeyBackspace:
-			line := n.lines[n.cur]
-			if len(line) > 0 {
-				n.lines[n.cur] = line[:len(line)-1]
-			} else if n.cur > 0 {
-				n.lines = append(n.lines[:n.cur], n.lines[n.cur+1:]...)
-				n.cur--
-			}
-		default:
-			if msg.Type == tea.KeyRunes {
-				n.lines[n.cur] += string(msg.Runes)
-			}
-		}
+		n.handleKey(msg)
 	}
+
 	return n, nil
 }
 
 func (n *notepad) View() string {
-	var b strings.Builder
+	var output strings.Builder
+
 	for i, line := range n.lines {
 		if i == n.cur {
-			b.WriteString(lipgloss.NewStyle().
+			output.WriteString(lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#FFFF00")).
-				Render("> "+line+"_"))
+				Render("> " + line + "_"))
 		} else {
-			b.WriteString("  " + line)
+			output.WriteString("  " + line)
 		}
-		b.WriteByte('\n')
+
+		output.WriteByte('\n')
 	}
-	return b.String()
+
+	return output.String()
+}
+
+func (n *notepad) handleKey(msg tea.KeyMsg) {
+	switch msg.Type {
+	case tea.KeyUp:
+		if n.cur > 0 {
+			n.cur--
+		}
+	case tea.KeyDown:
+		if n.cur < len(n.lines)-1 {
+			n.cur++
+		}
+	case tea.KeyEnter:
+		n.lines = append(n.lines[:n.cur+1], append([]string{""}, n.lines[n.cur+1:]...)...)
+		n.cur++
+	case tea.KeyBackspace:
+		n.handleBackspace()
+	case tea.KeyRunes:
+		n.lines[n.cur] += string(msg.Runes)
+	}
+}
+
+func (n *notepad) handleBackspace() {
+	line := n.lines[n.cur]
+	if len(line) > 0 {
+		n.lines[n.cur] = line[:len(line)-1]
+	} else if n.cur > 0 {
+		n.lines = append(n.lines[:n.cur], n.lines[n.cur+1:]...)
+		n.cur--
+	}
 }
 
 // listView is a scrollable list widget.
@@ -86,57 +97,62 @@ func newListView(items []string) *listView {
 	return &listView{items: items}
 }
 
-func (l *listView) Init() tea.Cmd { return nil }
+func (lv *listView) Init() tea.Cmd { return nil }
 
-func (l *listView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
+func (lv *listView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) { //nolint: gocritic
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyUp:
-			if l.selected > 0 {
-				l.selected--
+			if lv.selected > 0 {
+				lv.selected--
 			}
 		case tea.KeyDown:
-			if l.selected < len(l.items)-1 {
-				l.selected++
+			if lv.selected < len(lv.items)-1 {
+				lv.selected++
 			}
 		}
 	}
-	return l, nil
+
+	return lv, nil
 }
 
-func (l *listView) View() string {
-	var b strings.Builder
-	for i, item := range l.items {
-		if i == l.selected {
-			b.WriteString(lipgloss.NewStyle().
+func (lv *listView) View() string {
+	var output strings.Builder
+
+	for i, item := range lv.items {
+		if i == lv.selected {
+			output.WriteString(lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#000000")).
 				Background(lipgloss.Color("#00AAAA")).
-				Render(" "+item+" "))
+				Render(" " + item + " "))
 		} else {
-			b.WriteString("  " + item)
+			output.WriteString("  " + item)
 		}
-		b.WriteByte('\n')
+
+		output.WriteByte('\n')
 	}
-	return b.String()
+
+	return output.String()
 }
 
-// clockWidget displays a static message (placeholder for any widget).
-type clockWidget struct {
+// infoWidget displays a static message.
+type infoWidget struct {
 	message string
 }
 
-func (c *clockWidget) Init() tea.Cmd { return nil }
+func (iw *infoWidget) Init() tea.Cmd { return nil }
 
-func (c *clockWidget) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return c, nil
+func (iw *infoWidget) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return iw, nil
 }
 
-func (c *clockWidget) View() string {
+func (iw *infoWidget) View() string {
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#00AAAA")).
 		Bold(true)
-	return style.Render(c.message)
+
+	return style.Render(iw.message)
 }
 
 // --- Main application model ---
@@ -146,19 +162,19 @@ type model struct {
 }
 
 func newModel() *model {
-	m := &model{
+	app := &model{
 		manager: wm.New(),
 	}
 
 	// Window 1: Notepad at top-left.
-	m.manager.Add(
+	app.manager.Add(
 		newNotepad("notes", "Hello from the window manager!\nTry clicking other windows.\nType here to edit."),
 		"Notepad",
 		2, 1, 40, 15,
 	)
 
 	// Window 2: List view, overlapping the first.
-	m.manager.Add(
+	app.manager.Add(
 		newListView([]string{
 			"Documents", "Downloads", "Pictures",
 			"Music", "Videos", "Desktop",
@@ -168,66 +184,79 @@ func newModel() *model {
 		20, 5, 30, 14,
 	)
 
+	helpText := "Window Manager Example\n\n" +
+		"Drag title bars to move.\n" +
+		"Drag ◢ to resize.\n" +
+		"Click to focus.\n" +
+		"Tab to cycle windows.\n" +
+		"F10 to quit."
+
 	// Window 3: Small info widget at the right.
-	m.manager.Add(
-		&clockWidget{message: "Window Manager Example\n\nDrag title bars to move.\nDrag ◢ to resize.\nClick to focus.\nTab to cycle windows.\nF10 to quit."},
+	app.manager.Add(
+		&infoWidget{message: helpText},
 		"Help",
 		50, 2, 32, 12,
 	)
 
-	return m
+	return app
 }
 
-func (m *model) Init() tea.Cmd {
-	return m.manager.Init()
+func (app *model) Init() tea.Cmd {
+	return app.manager.Init()
 }
 
-func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (app *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyF10:
-			return m, tea.Quit
+			return app, tea.Quit
 		case tea.KeyTab:
-			m.cycleWindows()
-			return m, nil
+			app.cycleWindows()
+
+			return app, nil
 		}
 	case tea.WindowSizeMsg:
-		m.manager.SetSize(msg.Width, msg.Height)
+		app.manager.SetSize(msg.Width, msg.Height)
 	}
 
-	cmd := m.manager.Update(msg)
-	return m, cmd
+	cmd := app.manager.Update(msg)
+
+	return app, cmd
 }
 
-func (m *model) View() string {
-	return m.manager.View()
+func (app *model) View() string {
+	return app.manager.View()
 }
 
-func (m *model) cycleWindows() {
-	windows := m.manager.Windows()
+func (app *model) cycleWindows() {
+	windows := app.manager.Windows()
 	if len(windows) < 2 {
 		return
 	}
+
 	// Find focused, focus the next one.
-	for i, w := range windows {
-		if w.Focused {
+	for i, win := range windows {
+		if win.Focused {
 			next := windows[(i+1)%len(windows)]
-			m.manager.Focus(next.ID)
+			app.manager.Focus(next.ID)
+
 			return
 		}
 	}
-	m.manager.Focus(windows[0].ID)
+
+	app.manager.Focus(windows[0].ID)
 }
 
 func main() {
-	p := tea.NewProgram(
+	program := tea.NewProgram(
 		newModel(),
 		tea.WithAltScreen(),
 		tea.WithMouseAllMotion(),
 	)
 
-	if _, err := p.Run(); err != nil {
+	_, err := program.Run()
+	if err != nil {
 		log.Fatal(fmt.Errorf("error running program: %w", err))
 	}
 }

@@ -40,10 +40,9 @@ func (m *Model) Init() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var (
-		cmds []tea.Cmd
-		cmd  tea.Cmd
-	)
+	cmds := make([]tea.Cmd, 0, 2)
+
+	var cmd tea.Cmd
 
 	switch msg := msg.(type) { //nolint: gocritic
 	case tea.KeyMsg:
@@ -51,9 +50,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case tea.WindowSizeMsg:
-		w := msg.Width - 2
-		h := msg.Height - 2
-		m.wm.SetSize(w, h)
+		width := msg.Width - 2
+		height := msg.Height - 2
+		m.wm.SetSize(width, height)
 	}
 
 	// Update window manager (handles mouse, keys to focused window).
@@ -77,5 +76,6 @@ func (m *Model) View() string {
 
 	// Overlay wm windows on top of main form via canvas compositing.
 	width, height := m.wm.Width(), m.wm.Height()
+
 	return wm.Overlay(base, wmView, width, height)
 }

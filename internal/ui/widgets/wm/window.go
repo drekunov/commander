@@ -30,21 +30,16 @@ type Window struct {
 }
 
 // NewWindow creates a window with the given content, position, and size.
-func NewWindow(id int, content tea.Model, x, y, w, h int) *Window {
+func NewWindow(id int, content tea.Model, posX, posY, width, height int) *Window {
 	return &Window{
 		ID:      id,
 		Content: content,
-		X:       x,
-		Y:       y,
-		Width:   w,
-		Height:  h,
+		X:       posX,
+		Y:       posY,
+		Width:   width,
+		Height:  height,
 		Visible: true,
 	}
-}
-
-// Rect returns the window's bounding rectangle.
-func (w *Window) Rect() (x, y, width, height int) {
-	return w.X, w.Y, w.Width, w.Height
 }
 
 // Contains returns true if the screen coordinate is inside the window.

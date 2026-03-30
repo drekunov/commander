@@ -13,67 +13,77 @@ type StyleSheet map[string]map[string]string
 
 // ParseCSS parses a CSS string into a StyleSheet using the vanng822/css parser.
 func ParseCSS(data string) StyleSheet {
-	ss := make(StyleSheet)
+	sheet := make(StyleSheet)
 	parsed := css.Parse(data)
 
 	for _, rule := range parsed.GetCSSRuleList() {
 		selector := rule.Style.Selector.Text()
+
 		props := make(map[string]string)
 		for _, decl := range rule.Style.Styles {
 			props[decl.Property] = decl.Value.Text()
 		}
+
 		if len(props) > 0 {
-			ss[selector] = props
+			sheet[selector] = props
 		}
 	}
 
-	return ss
+	return sheet
 }
 
 // ApplyStyle builds a lipgloss.Style from CSS properties.
 func ApplyStyle(props map[string]string) lipgloss.Style {
-	s := lipgloss.NewStyle()
+	style := lipgloss.NewStyle()
 
-	if v, ok := props["color"]; ok {
-		s = s.Foreground(lipgloss.Color(v))
+	if val, ok := props["color"]; ok {
+		style = style.Foreground(lipgloss.Color(val))
 	}
-	if v, ok := props["background-color"]; ok {
-		s = s.Background(lipgloss.Color(v))
+
+	if val, ok := props["background-color"]; ok {
+		style = style.Background(lipgloss.Color(val))
 	}
-	if v, ok := props["text-decoration"]; ok && v == "underline" {
-		s = s.Underline(true)
+
+	if val, ok := props["text-decoration"]; ok && val == "underline" {
+		style = style.Underline(true)
 	}
-	if v, ok := props["padding"]; ok {
-		top, right, bottom, left := parseBox(v)
-		s = s.Padding(top, right, bottom, left)
+
+	if val, ok := props["padding"]; ok {
+		top, right, bottom, left := parseBox(val)
+		style = style.Padding(top, right, bottom, left)
 	}
-	if v, ok := props["margin"]; ok {
-		top, right, bottom, left := parseBox(v)
-		s = s.Margin(top, right, bottom, left)
+
+	if val, ok := props["margin"]; ok {
+		top, right, bottom, left := parseBox(val)
+		style = style.Margin(top, right, bottom, left)
 	}
-	if v, ok := props["border-style"]; ok {
-		border := parseBorder(v)
-		s = s.Border(border).
+
+	if val, ok := props["border-style"]; ok {
+		border := parseBorder(val)
+		style = style.Border(border).
 			BorderTop(true).
 			BorderLeft(true).
 			BorderRight(true).
 			BorderBottom(true)
 	}
-	if v, ok := props["border-color"]; ok {
-		s = s.BorderForeground(lipgloss.Color(v))
+
+	if val, ok := props["border-color"]; ok {
+		style = style.BorderForeground(lipgloss.Color(val))
 	}
 
-	return s
+	return style
 }
 
 // parseBox parses CSS box values (1, 2, or 4 integers).
-func parseBox(v string) (top, right, bottom, left int) {
-	parts := strings.Fields(v)
+func parseBox(val string) (int, int, int, int) {
+	parts := strings.Fields(val)
+
 	nums := make([]int, len(parts))
-	for i, p := range parts {
-		n, _ := strconv.Atoi(p)
-		nums[i] = n
+	for i, part := range parts {
+		parsed, _ := strconv.Atoi(part)
+		nums[i] = parsed
 	}
+
 	switch len(nums) {
 	case 1:
 		return nums[0], nums[0], nums[0], nums[0]
@@ -84,11 +94,12 @@ func parseBox(v string) (top, right, bottom, left int) {
 	case 4:
 		return nums[0], nums[1], nums[2], nums[3]
 	}
+
 	return 0, 0, 0, 0
 }
 
-func parseBorder(v string) lipgloss.Border {
-	switch strings.ToLower(v) {
+func parseBorder(val string) lipgloss.Border {
+	switch strings.ToLower(val) {
 	case "rounded":
 		return lipgloss.RoundedBorder()
 	case "double":

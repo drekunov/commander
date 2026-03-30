@@ -76,12 +76,13 @@ func (m *Model) Confirm(title, message string) bool {
 }
 
 // addDialogWindow adds a tea.Model as a centered dialog window via the wm.
-func (m *Model) addDialogWindow(w tea.Model, title string) int {
+func (m *Model) addDialogWindow(content tea.Model, title string) int {
 	width := m.wm.Width()
 	height := m.wm.Height()
 	winW := width / 2
 	winH := height / 2
-	x := (width - winW) / 2
-	y := (height - winH) / 2
-	return m.wm.Add(w, title, x, y, winW, winH)
+	posX := (width - winW) / 2
+	posY := (height - winH) / 2
+
+	return m.wm.Add(content, title, posX, posY, winW, winH)
 }

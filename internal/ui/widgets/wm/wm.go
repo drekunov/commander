@@ -28,9 +28,9 @@ func New() *Manager {
 }
 
 // SetSize sets the available screen area for the manager.
-func (m *Manager) SetSize(w, h int) {
-	m.width = w
-	m.height = h
+func (m *Manager) SetSize(width, height int) {
+	m.width = width
+	m.height = height
 }
 
 // Width returns the manager's width.
@@ -39,34 +39,37 @@ func (m *Manager) Width() int { return m.width }
 // Height returns the manager's height.
 func (m *Manager) Height() int { return m.height }
 
-// Add creates a new window containing the given tea.Model at position (x, y)
+// Add creates a new window containing the given tea.Model at position (posX, posY)
 // with the given dimensions. Returns the window ID.
-func (m *Manager) Add(content tea.Model, title string, x, y, w, h int) int {
-	id := m.nextID
+func (m *Manager) Add(content tea.Model, title string, posX, posY, width, height int) int {
+	winID := m.nextID
 	m.nextID++
 
-	win := NewWindow(id, content, x, y, w, h)
+	win := NewWindow(winID, content, posX, posY, width, height)
 	win.Title = title
 	win.ZIndex = m.topZIndex() + 1
 	win.Focused = true
 
 	// Unfocus all others.
-	for _, ow := range m.windows {
-		ow.Focused = false
+	for _, other := range m.windows {
+		other.Focused = false
 	}
 
 	m.windows = append(m.windows, win)
-	return id
+
+	return winID
 }
 
 // Remove removes a window by ID.
-func (m *Manager) Remove(id int) {
-	for i, w := range m.windows {
-		if w.ID == id {
+func (m *Manager) Remove(winID int) {
+	for i, win := range m.windows {
+		if win.ID == winID {
 			m.windows = append(m.windows[:i], m.windows[i+1:]...)
+
 			break
 		}
 	}
+
 	// Focus top-most remaining window.
 	if top := m.topWindow(); top != nil {
 		top.Focused = true
@@ -74,49 +77,54 @@ func (m *Manager) Remove(id int) {
 }
 
 // Focus brings a window to the front and focuses it.
-func (m *Manager) Focus(id int) {
-	for _, w := range m.windows {
-		if w.ID == id {
-			w.Focused = true
-			w.ZIndex = m.topZIndex() + 1
+func (m *Manager) Focus(winID int) {
+	for _, win := range m.windows {
+		if win.ID == winID {
+			win.Focused = true
+			win.ZIndex = m.topZIndex() + 1
 		} else {
-			w.Focused = false
+			win.Focused = false
 		}
 	}
 }
 
 // Move sets a window's position.
-func (m *Manager) Move(id, x, y int) {
-	if w := m.get(id); w != nil {
-		w.X = x
-		w.Y = y
+func (m *Manager) Move(winID, posX, posY int) {
+	if win := m.get(winID); win != nil {
+		win.X = posX
+		win.Y = posY
 	}
 }
 
 // Resize sets a window's dimensions, respecting minimums.
-func (m *Manager) Resize(id, w, h int) {
-	if win := m.get(id); win != nil {
-		if w < minWindowWidth {
-			w = minWindowWidth
-		}
-		if h < minWindowHeight {
-			h = minWindowHeight
-		}
-		win.Width = w
-		win.Height = h
+func (m *Manager) Resize(winID, width, height int) {
+	win := m.get(winID)
+	if win == nil {
+		return
 	}
+
+	if width < minWindowWidth {
+		width = minWindowWidth
+	}
+
+	if height < minWindowHeight {
+		height = minWindowHeight
+	}
+
+	win.Width = width
+	win.Height = height
 }
 
 // SetZIndex sets a window's z-index.
-func (m *Manager) SetZIndex(id, z int) {
-	if w := m.get(id); w != nil {
-		w.ZIndex = z
+func (m *Manager) SetZIndex(winID, zIndex int) {
+	if win := m.get(winID); win != nil {
+		win.ZIndex = zIndex
 	}
 }
 
 // Get returns a window by ID, or nil if not found.
-func (m *Manager) Get(id int) *Window {
-	return m.get(id)
+func (m *Manager) Get(winID int) *Window {
+	return m.get(winID)
 }
 
 // Windows returns all windows sorted by z-index (back to front).
@@ -126,17 +134,20 @@ func (m *Manager) Windows() []*Window {
 	sort.Slice(sorted, func(i, j int) bool {
 		return sorted[i].ZIndex < sorted[j].ZIndex
 	})
+
 	return sorted
 }
 
 // Init initializes all windows.
 func (m *Manager) Init() tea.Cmd {
 	var cmds []tea.Cmd
-	for _, w := range m.windows {
-		if cmd := w.Content.Init(); cmd != nil {
+
+	for _, win := range m.windows {
+		if cmd := win.Content.Init(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	}
+
 	return tea.Batch(cmds...)
 }
 
@@ -152,13 +163,16 @@ func (m *Manager) Update(msg tea.Msg) tea.Cmd {
 
 	// Other messages go to all windows.
 	var cmds []tea.Cmd
-	for _, w := range m.windows {
+
+	for _, win := range m.windows {
 		var cmd tea.Cmd
-		w.Content, cmd = w.Content.Update(msg)
+
+		win.Content, cmd = win.Content.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	}
+
 	return tea.Batch(cmds...)
 }
 
@@ -168,37 +182,40 @@ func (m *Manager) View() string {
 		return ""
 	}
 
-	c := newCanvas(m.width, m.height)
+	cvs := newCanvas(m.width, m.height)
 	sorted := m.Windows()
 
-	for _, w := range sorted {
-		if !w.Visible {
+	for _, win := range sorted {
+		if !win.Visible {
 			continue
 		}
-		rendered := m.renderWindow(w)
-		c.stamp(w.X, w.Y, rendered)
+
+		rendered := m.renderWindow(win)
+		cvs.stamp(win.X, win.Y, rendered)
 	}
 
-	return c.String()
+	return cvs.String()
 }
 
 // renderWindow draws a window frame with title bar and content.
-func (m *Manager) renderWindow(w *Window) string {
+func (m *Manager) renderWindow(win *Window) string {
 	// Inner content area (subtract 2 for borders, 1 for title bar).
-	innerW := w.Width - 2
-	innerH := w.Height - 3
+	innerW := win.Width - 2
+	innerH := win.Height - 3
+
 	if innerW < 1 {
 		innerW = 1
 	}
+
 	if innerH < 1 {
 		innerH = 1
 	}
 
 	// Render the tea.Model content.
-	content := w.Content.View()
+	content := win.Content.View()
 
 	// Build title bar.
-	titleBar := m.buildTitleBar(w, innerW)
+	titleBar := m.buildTitleBar(win, innerW)
 
 	// Build resize grip.
 	grip := m.buildResizeGrip(innerW)
@@ -216,36 +233,38 @@ func (m *Manager) renderWindow(w *Window) string {
 		Render(content)
 
 	// Compose: title bar + content + grip, with side borders.
-	var b strings.Builder
-	// Top border with title.
-	b.WriteString(titleBar)
-	b.WriteByte('\n')
+	var out strings.Builder
+
+	out.WriteString(titleBar)
+	out.WriteByte('\n')
 
 	// Content lines with side borders.
-	lines := strings.Split(framedContent, "\n")
-	for _, line := range lines {
-		b.WriteString(styledLeft)
+	for line := range strings.SplitSeq(framedContent, "\n") {
+		out.WriteString(styledLeft)
+
 		// Pad or clip line to innerW.
 		lineW := lipgloss.Width(line)
 		if lineW < innerW {
 			line += strings.Repeat(" ", innerW-lineW)
 		}
-		b.WriteString(line)
-		b.WriteString(styledRight)
-		b.WriteByte('\n')
+
+		out.WriteString(line)
+		out.WriteString(styledRight)
+		out.WriteByte('\n')
 	}
 
 	// Bottom border with resize grip.
-	b.WriteString(grip)
+	out.WriteString(grip)
 
-	return b.String()
+	return out.String()
 }
 
-func (m *Manager) buildTitleBar(w *Window, innerW int) string {
+func (m *Manager) buildTitleBar(win *Window, innerW int) string {
 	border := config.Values.DialogBoxStyle.GetBorderStyle()
 	borderColor := config.Values.DialogBoxStyle.GetBorderBottomForeground()
 
-	title := " " + w.Title + " "
+	title := " " + win.Title + " "
+
 	titleLen := lipgloss.Width(title)
 	if titleLen > innerW {
 		title = title[:innerW]
@@ -263,7 +282,7 @@ func (m *Manager) buildTitleBar(w *Window, innerW int) string {
 		border.TopRight
 
 	style := lipgloss.NewStyle().Foreground(borderColor)
-	if w.Focused {
+	if win.Focused {
 		style = style.Bold(true)
 	}
 
@@ -287,75 +306,86 @@ func (m *Manager) buildResizeGrip(innerW int) string {
 }
 
 func (m *Manager) handleMouse(msg tea.MouseMsg) tea.Cmd {
-	x, y := msg.X, msg.Y
+	mouseX, mouseY := msg.X, msg.Y
 
 	switch msg.Action {
 	case tea.MouseActionPress:
 		if msg.Button != tea.MouseButtonLeft {
 			return nil
 		}
-		// Check windows from front to back for click target.
-		sorted := m.Windows()
-		for i := len(sorted) - 1; i >= 0; i-- {
-			w := sorted[i]
-			if !w.Visible || !w.Contains(x, y) {
-				continue
-			}
 
-			m.Focus(w.ID)
-
-			if w.InTitleBar(x, y) {
-				w.dragging = true
-				w.dragOffX = x - w.X
-				w.dragOffY = y - w.Y
-				return nil
-			}
-
-			if w.InResizeGrip(x, y) {
-				w.resizing = true
-				w.resizeOrigW = w.Width
-				w.resizeOrigH = w.Height
-				w.resizeOrigX = x
-				w.resizeOrigY = y
-				return nil
-			}
-
-			// Click inside content area — translate coordinates and forward.
-			localX := x - w.X - 1 // -1 for left border
-			localY := y - w.Y - 1 // -1 for title bar
-			localMsg := tea.MouseMsg{
-				X:      localX,
-				Y:      localY,
-				Action: msg.Action,
-				Button: msg.Button,
-			}
-			var cmd tea.Cmd
-			w.Content, cmd = w.Content.Update(localMsg)
-			return cmd
-		}
+		return m.handleMousePress(mouseX, mouseY, msg)
 
 	case tea.MouseActionMotion:
-		for _, w := range m.windows {
-			if w.dragging {
-				w.X = x - w.dragOffX
-				w.Y = y - w.dragOffY
+		for _, win := range m.windows {
+			if win.dragging {
+				win.X = mouseX - win.dragOffX
+				win.Y = mouseY - win.dragOffY
+
 				return nil
 			}
-			if w.resizing {
-				dw := x - w.resizeOrigX
-				dh := y - w.resizeOrigY
-				newW := w.resizeOrigW + dw
-				newH := w.resizeOrigH + dh
-				m.Resize(w.ID, newW, newH)
+
+			if win.resizing {
+				deltaW := mouseX - win.resizeOrigX
+				deltaH := mouseY - win.resizeOrigY
+				m.Resize(win.ID, win.resizeOrigW+deltaW, win.resizeOrigH+deltaH)
+
 				return nil
 			}
 		}
 
 	case tea.MouseActionRelease:
-		for _, w := range m.windows {
-			w.dragging = false
-			w.resizing = false
+		for _, win := range m.windows {
+			win.dragging = false
+			win.resizing = false
 		}
+	}
+
+	return nil
+}
+
+func (m *Manager) handleMousePress(mouseX, mouseY int, msg tea.MouseMsg) tea.Cmd {
+	sorted := m.Windows()
+
+	for i := len(sorted) - 1; i >= 0; i-- {
+		win := sorted[i]
+		if !win.Visible || !win.Contains(mouseX, mouseY) {
+			continue
+		}
+
+		m.Focus(win.ID)
+
+		if win.InTitleBar(mouseX, mouseY) {
+			win.dragging = true
+			win.dragOffX = mouseX - win.X
+			win.dragOffY = mouseY - win.Y
+
+			return nil
+		}
+
+		if win.InResizeGrip(mouseX, mouseY) {
+			win.resizing = true
+			win.resizeOrigW = win.Width
+			win.resizeOrigH = win.Height
+			win.resizeOrigX = mouseX
+			win.resizeOrigY = mouseY
+
+			return nil
+		}
+
+		// Click inside content area — translate coordinates and forward.
+		localMsg := tea.MouseMsg{
+			X:      mouseX - win.X - 1,
+			Y:      mouseY - win.Y - 1,
+			Action: msg.Action,
+			Button: msg.Button,
+		}
+
+		var cmd tea.Cmd
+
+		win.Content, cmd = win.Content.Update(localMsg)
+
+		return cmd
 	}
 
 	return nil
@@ -363,43 +393,51 @@ func (m *Manager) handleMouse(msg tea.MouseMsg) tea.Cmd {
 
 func (m *Manager) handleKey(msg tea.KeyMsg) tea.Cmd {
 	// Route key events only to the focused window.
-	for _, w := range m.windows {
-		if w.Focused && w.Visible {
+	for _, win := range m.windows {
+		if win.Focused && win.Visible {
 			var cmd tea.Cmd
-			w.Content, cmd = w.Content.Update(msg)
+
+			win.Content, cmd = win.Content.Update(msg)
+
 			return cmd
 		}
 	}
+
 	return nil
 }
 
 // Helpers.
 
-func (m *Manager) get(id int) *Window {
-	for _, w := range m.windows {
-		if w.ID == id {
-			return w
+func (m *Manager) get(winID int) *Window {
+	for _, win := range m.windows {
+		if win.ID == winID {
+			return win
 		}
 	}
+
 	return nil
 }
 
 func (m *Manager) topZIndex() int {
-	z := 0
-	for _, w := range m.windows {
-		if w.ZIndex > z {
-			z = w.ZIndex
+	zIndex := 0
+
+	for _, win := range m.windows {
+		if win.ZIndex > zIndex {
+			zIndex = win.ZIndex
 		}
 	}
-	return z
+
+	return zIndex
 }
 
 func (m *Manager) topWindow() *Window {
 	var top *Window
-	for _, w := range m.windows {
-		if top == nil || w.ZIndex > top.ZIndex {
-			top = w
+
+	for _, win := range m.windows {
+		if top == nil || win.ZIndex > top.ZIndex {
+			top = win
 		}
 	}
+
 	return top
 }
