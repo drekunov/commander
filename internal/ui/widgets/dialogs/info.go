@@ -37,7 +37,7 @@ func (m *Info) Free() {
 
 func (m *Info) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
-		cmds []tea.Cmd
+		cmds = make([]tea.Cmd, 0, 1)
 		cmd  tea.Cmd
 	)
 

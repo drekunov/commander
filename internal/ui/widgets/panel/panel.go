@@ -33,7 +33,7 @@ func (m *Model) Init() tea.Cmd {
 
 func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var (
-		cmds []tea.Cmd
+		cmds = make([]tea.Cmd, 0, 1)
 		cmd  tea.Cmd
 	)
 

@@ -1,8 +1,14 @@
 package config
 
 import (
+	_ "embed"
+	"os"
+
 	"github.com/charmbracelet/lipgloss"
 )
+
+//go:embed styles.css
+var defaultCSS string
 
 type Config struct {
 	ButtonStyle        lipgloss.Style
@@ -17,51 +23,22 @@ type Config struct {
 var Values Config
 
 func init() {
-	dialogBoxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#874BFD")).
-		Padding(0, 1, 0, 1).
-		BorderTop(true).
-		BorderLeft(true).
-		BorderRight(true).
-		BorderBottom(true)
+	cssData := defaultCSS
 
-	buttonStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FFF7DB")).
-		Background(lipgloss.Color("#888B7E")).
-		Padding(0, 1, 0, 1).
-		Margin(1, 1, 1, 1)
+	data, err := os.ReadFile("styles.css")
+	if err == nil {
+		cssData = string(data)
+	}
 
-	activeButtonStyle := buttonStyle.
-		Foreground(lipgloss.Color("#FFF7DB")).
-		Background(lipgloss.Color("#F25D94")).
-		Underline(true)
-
-	pressedButtonStyle := activeButtonStyle.
-		Background(lipgloss.Color("#725D94"))
-
-	textStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FFF7DB")).
-		Padding(0, 0).
-		Margin(1, 1, 0, 1)
-
-	inputStyle := textStyle.
-		Foreground(lipgloss.Color("#874BFD")).
-		Padding(0, 0, 0, 0).
-		Margin(1, 1, 0, 1)
-
-	tableStyle := dialogBoxStyle.
-		Border(lipgloss.HiddenBorder(), false).
-		Padding(0, 1, 0, 1).
-		Margin(0, 0, 0, 0)
+	stylesheet := ParseCSS(cssData)
 
 	Values = Config{
-		ButtonStyle:        buttonStyle,
-		ActiveButtonStyle:  activeButtonStyle,
-		PressedButtonStyle: pressedButtonStyle,
-		DialogBoxStyle:     dialogBoxStyle,
-		TextStyle:          textStyle,
-		InputStyle:         inputStyle,
-		TableStyle:         tableStyle,
+		ButtonStyle:        ApplyStyle(stylesheet[".button"]),
+		ActiveButtonStyle:  ApplyStyle(stylesheet[".active-button"]),
+		PressedButtonStyle: ApplyStyle(stylesheet[".pressed-button"]),
+		DialogBoxStyle:     ApplyStyle(stylesheet[".dialog-box"]),
+		TextStyle:          ApplyStyle(stylesheet[".text"]),
+		InputStyle:         ApplyStyle(stylesheet[".input"]),
+		TableStyle:         ApplyStyle(stylesheet[".table"]),
 	}
 }

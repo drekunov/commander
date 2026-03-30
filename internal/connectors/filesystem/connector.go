@@ -44,7 +44,7 @@ func (f *FileSystem) ReadDir(path string) ([]app.AttributeList, error) {
 	attributeList := make([]app.AttributeList, 0, len(entries))
 
 	for _, entry := range entries {
-		attrs := make(app.AttributeList, 0)
+		attrs := make(app.AttributeList, 0, 4)
 
 		attrs = append(attrs, app.Attribute{
 			AttrName:  "path",

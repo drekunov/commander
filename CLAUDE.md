@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Build the application
-go build ./cmd/gc
+go build ./cmd/commander
 
 # Run the application
-go run ./cmd/gc
+go run ./cmd/commander
 
 # Lint (requires gofumpt, gci, golangci-lint)
 make lint
