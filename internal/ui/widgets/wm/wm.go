@@ -152,12 +152,22 @@ func (m *Manager) Init() tea.Cmd {
 }
 
 // Update processes input messages. Mouse events handle drag/resize/focus;
-// key events are routed only to the focused window.
+// Tab cycles window focus; key events are routed only to the focused window.
 func (m *Manager) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.SetSize(msg.Width, msg.Height)
+
+		return nil
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
 	case tea.KeyMsg:
+		if msg.Type == tea.KeyTab {
+			m.CycleFocus()
+
+			return nil
+		}
+
 		return m.handleKey(msg)
 	}
 
@@ -176,20 +186,50 @@ func (m *Manager) Update(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// CycleFocus moves focus to the next window in z-order.
+func (m *Manager) CycleFocus() {
+	windows := m.Windows()
+	if len(windows) < 2 {
+		return
+	}
+
+	for i, win := range windows {
+		if win.Focused {
+			next := windows[(i+1)%len(windows)]
+			m.Focus(next.ID)
+
+			return
+		}
+	}
+
+	m.Focus(windows[0].ID)
+}
+
 // View composites all visible windows onto a canvas, sorted by z-index.
+// Returns "" when there is nothing to overlay so callers can skip compositing.
 func (m *Manager) View() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
 
-	cvs := newCanvas(m.width, m.height)
 	sorted := m.Windows()
 
-	for _, win := range sorted {
-		if !win.Visible {
-			continue
-		}
+	// Collect only visible windows; skip compositing entirely if there are none.
+	var visible []*Window
 
+	for _, win := range sorted {
+		if win.Visible {
+			visible = append(visible, win)
+		}
+	}
+
+	if len(visible) == 0 {
+		return ""
+	}
+
+	cvs := newCanvas(m.width, m.height)
+
+	for _, win := range visible {
 		rendered := m.renderWindow(win)
 		cvs.stamp(win.X, win.Y, rendered)
 	}
@@ -220,16 +260,19 @@ func (m *Manager) renderWindow(win *Window) string {
 	// Build resize grip.
 	grip := m.buildResizeGrip(innerW)
 
-	// Frame the content with a border.
+	// Frame the content with a border — blue background fills the side borders.
+	bgColor := config.Values.DialogBoxStyle.GetBackground()
 	border := config.Values.DialogBoxStyle.GetBorderStyle()
-	borderColor := lipgloss.NewStyle().
-		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground())
-	styledLeft := borderColor.Render(border.Left)
-	styledRight := borderColor.Render(border.Right)
+	borderStyle := lipgloss.NewStyle().
+		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground()).
+		Background(bgColor)
+	styledLeft := borderStyle.Render(border.Left)
+	styledRight := borderStyle.Render(border.Right)
 
 	framedContent := lipgloss.NewStyle().
 		Width(innerW).
 		Height(innerH).
+		Background(bgColor).
 		Render(content)
 
 	// Compose: title bar + content + grip, with side borders.
@@ -239,13 +282,15 @@ func (m *Manager) renderWindow(win *Window) string {
 	out.WriteByte('\n')
 
 	// Content lines with side borders.
+	padStyle := lipgloss.NewStyle().Background(bgColor)
+
 	for line := range strings.SplitSeq(framedContent, "\n") {
 		out.WriteString(styledLeft)
 
 		// Pad or clip line to innerW.
 		lineW := lipgloss.Width(line)
 		if lineW < innerW {
-			line += strings.Repeat(" ", innerW-lineW)
+			line += padStyle.Render(strings.Repeat(" ", innerW-lineW))
 		}
 
 		out.WriteString(line)
@@ -261,9 +306,11 @@ func (m *Manager) renderWindow(win *Window) string {
 
 func (m *Manager) buildTitleBar(win *Window, innerW int) string {
 	border := config.Values.DialogBoxStyle.GetBorderStyle()
-	borderColor := config.Values.DialogBoxStyle.GetBorderBottomForeground()
+	bgColor := config.Values.DialogBoxStyle.GetBackground()
+	borderFg := config.Values.DialogBoxStyle.GetBorderBottomForeground()
 
-	title := " " + win.Title + " "
+	// NC-style title: [ Title ]
+	title := "[ " + win.Title + " ]"
 
 	titleLen := lipgloss.Width(title)
 	if titleLen > innerW {
@@ -275,22 +322,31 @@ func (m *Manager) buildTitleBar(win *Window, innerW int) string {
 	left := padding / 2
 	right := padding - left
 
-	bar := border.TopLeft +
-		strings.Repeat(border.Top, left) +
-		title +
-		strings.Repeat(border.Top, right) +
-		border.TopRight
+	borderStyle := lipgloss.NewStyle().Foreground(borderFg).Background(bgColor)
 
-	style := lipgloss.NewStyle().Foreground(borderColor)
+	var titleStyle lipgloss.Style
 	if win.Focused {
-		style = style.Bold(true)
+		// Focused: bright white title, bold — matches NC active dialog style.
+		titleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(bgColor).
+			Bold(true)
+	} else {
+		// Unfocused: same cyan as the border, no bold.
+		titleStyle = lipgloss.NewStyle().
+			Foreground(borderFg).
+			Background(bgColor)
 	}
 
-	return style.Render(bar)
+	leftPart := border.TopLeft + strings.Repeat(border.Top, left)
+	rightPart := strings.Repeat(border.Top, right) + border.TopRight
+
+	return borderStyle.Render(leftPart) + titleStyle.Render(title) + borderStyle.Render(rightPart)
 }
 
 func (m *Manager) buildResizeGrip(innerW int) string {
 	border := config.Values.DialogBoxStyle.GetBorderStyle()
+	bgColor := config.Values.DialogBoxStyle.GetBackground()
 
 	gripRune := "◢"
 	bottomLen := max(innerW-1, 0)
@@ -302,6 +358,7 @@ func (m *Manager) buildResizeGrip(innerW int) string {
 
 	return lipgloss.NewStyle().
 		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground()).
+		Background(bgColor).
 		Render(grip)
 }
 
