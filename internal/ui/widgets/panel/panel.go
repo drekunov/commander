@@ -3,7 +3,6 @@ package panel
 import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/drekunov/gc/internal/config"
 )
 
@@ -17,65 +16,61 @@ type Model struct {
 	tableView table.Model
 }
 
-func NewPanel() Model {
-	tableView := table.New(
-		table.WithFocused(true),
-	)
-
-	return Model{
-		tableView: tableView,
+func NewPanel() *Model {
+	return &Model{
+		tableView: table.New(),
+		visible:   true,
 	}
+}
+
+// Focus activates the table cursor.
+func (m *Model) Focus() {
+	m.tableView.Focus()
+}
+
+// Blur hides the table cursor.
+func (m *Model) Blur() {
+	m.tableView.Blur()
 }
 
 func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	var (
-		cmds = make([]tea.Cmd, 0, 1)
-		cmd  tea.Cmd
-	)
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 
 	m.tableView, cmd = m.tableView.Update(msg)
-	cmds = append(cmds, cmd)
 
-	return *m, tea.Batch(cmds...)
+	return m, cmd
 }
 
+// View renders just the table content; the wm window provides the border frame.
 func (m *Model) View() string {
 	if !m.visible {
 		return ""
 	}
 
-	m.tableView.SetWidth(m.width - 10)
-	m.tableView.SetHeight(m.height - 10)
+	m.tableView.SetWidth(m.width)
+	m.tableView.SetHeight(m.height)
 
-	tableView := config.Values.TableStyle.Render(m.tableView.View())
-
-	output := config.Values.DialogBoxStyle.
-		Width(m.width-4).
-		Height(m.height-4).
-		Align(lipgloss.Center, lipgloss.Center).
-		BorderTop(false).
-		BorderBottom(false).
-		Render(tableView)
-
-	header := m.headerView(lipgloss.Width(output) - 2)
-
-	footer := m.footerView(lipgloss.Width(output) - 2)
-
-	output = lipgloss.JoinVertical(lipgloss.Center, header, output, footer)
-
-	return output
+	return config.Values.TableStyle.Render(m.tableView.View())
 }
 
 func (m *Model) SetTitle(title string) {
 	m.title = title
 }
 
+func (m *Model) Title() string {
+	return m.title
+}
+
 func (m *Model) SetFooter(footer string) {
 	m.footer = footer
+}
+
+func (m *Model) Footer() string {
+	return m.footer
 }
 
 func (m *Model) TableView() table.Model {
@@ -96,38 +91,4 @@ func (m *Model) SetHeight(height int) {
 
 func (m *Model) SetTableView(tableView table.Model) {
 	m.tableView = tableView
-}
-
-func (m *Model) headerView(width int) string {
-	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
-	header := lipgloss.PlaceHorizontal(
-		width,
-		lipgloss.Center,
-		" "+m.title+" ",
-		lipgloss.WithWhitespaceChars(borderStyle.Top))
-
-	header = lipgloss.JoinHorizontal(lipgloss.Center, borderStyle.TopLeft, header, borderStyle.TopRight)
-
-	header = lipgloss.NewStyle().
-		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground()).
-		Render(header)
-
-	return header
-}
-
-func (m *Model) footerView(width int) string {
-	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
-	footer := lipgloss.PlaceHorizontal(
-		width,
-		lipgloss.Center,
-		" "+m.footer+" ",
-		lipgloss.WithWhitespaceChars(borderStyle.Top))
-
-	footer = lipgloss.JoinHorizontal(lipgloss.Center, borderStyle.BottomLeft, footer, borderStyle.BottomRight)
-
-	footer = lipgloss.NewStyle().
-		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground()).
-		Render(footer)
-
-	return footer
 }

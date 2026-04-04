@@ -148,33 +148,28 @@ func (iw *infoWidget) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (iw *infoWidget) View() string {
-	style := lipgloss.NewStyle().
+	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#00AAAA")).
-		Bold(true)
-
-	return style.Render(iw.message)
+		Bold(true).
+		Render(iw.message)
 }
 
-// --- Main application model ---
+// --- App wraps Manager to add F10 quit ---
 
-type model struct {
-	manager *wm.Manager
+type app struct {
+	mgr *wm.Manager
 }
 
-func newModel() *model {
-	app := &model{
-		manager: wm.New(),
-	}
+func newApp() *app {
+	mgr := wm.New()
 
-	// Window 1: Notepad at top-left.
-	app.manager.Add(
+	mgr.Add(
 		newNotepad("notes", "Hello from the window manager!\nTry clicking other windows.\nType here to edit."),
 		"Notepad",
 		2, 1, 40, 15,
 	)
 
-	// Window 2: List view, overlapping the first.
-	app.manager.Add(
+	mgr.Add(
 		newListView([]string{
 			"Documents", "Downloads", "Pictures",
 			"Music", "Videos", "Desktop",
@@ -184,73 +179,35 @@ func newModel() *model {
 		20, 5, 30, 14,
 	)
 
-	helpText := "Window Manager Example\n\n" +
-		"Drag title bars to move.\n" +
-		"Drag ◢ to resize.\n" +
-		"Click to focus.\n" +
-		"Tab to cycle windows.\n" +
-		"F10 to quit."
-
-	// Window 3: Small info widget at the right.
-	app.manager.Add(
-		&infoWidget{message: helpText},
+	mgr.Add(
+		&infoWidget{message: "Window Manager Example\n\n" +
+			"Drag title bars to move.\n" +
+			"Drag ◢ to resize.\n" +
+			"Click to focus.\n" +
+			"Tab to cycle windows.\n" +
+			"F10 to quit."},
 		"Help",
 		50, 2, 32, 12,
 	)
 
-	return app
+	return &app{mgr: mgr}
 }
 
-func (app *model) Init() tea.Cmd {
-	return app.manager.Init()
-}
+func (a *app) Init() tea.Cmd { return a.mgr.Init() }
 
-func (app *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyF10:
-			return app, tea.Quit
-		case tea.KeyTab:
-			app.cycleWindows()
-
-			return app, nil
-		}
-	case tea.WindowSizeMsg:
-		app.manager.SetSize(msg.Width, msg.Height)
+func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyMsg); ok && key.Type == tea.KeyF10 {
+		return a, tea.Quit
 	}
 
-	cmd := app.manager.Update(msg)
-
-	return app, cmd
+	return a, a.mgr.Update(msg)
 }
 
-func (app *model) View() string {
-	return app.manager.View()
-}
-
-func (app *model) cycleWindows() {
-	windows := app.manager.Windows()
-	if len(windows) < 2 {
-		return
-	}
-
-	// Find focused, focus the next one.
-	for i, win := range windows {
-		if win.Focused {
-			next := windows[(i+1)%len(windows)]
-			app.manager.Focus(next.ID)
-
-			return
-		}
-	}
-
-	app.manager.Focus(windows[0].ID)
-}
+func (a *app) View() string { return a.mgr.View() }
 
 func main() {
 	program := tea.NewProgram(
-		newModel(),
+		newApp(),
 		tea.WithAltScreen(),
 		tea.WithMouseAllMotion(),
 	)

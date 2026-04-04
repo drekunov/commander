@@ -19,7 +19,10 @@ func rowFromAttrList(attrList app.AttributeList) table.Row {
 
 func (m *Model) SetData(data []app.AttributeList) {
 	panel := m.main.Panel()
-	panel.SetVisible(true)
+	if panel == nil {
+		return
+	}
+
 	view := panel.TableView()
 
 	if len(data) == 0 {
@@ -41,14 +44,14 @@ func (m *Model) SetData(data []app.AttributeList) {
 
 	view.SetColumns(cols)
 
-	rows := make([]table.Row, 0, len(data))
-	for _, row := range data {
+	// data[0] is the header row used for column titles above; skip it here.
+	rows := make([]table.Row, 0, len(data)-1)
+	for _, row := range data[1:] {
 		rows = append(rows, rowFromAttrList(row))
 	}
 
 	view.SetRows(rows)
 
 	panel.SetTableView(view)
-	m.main.SetPanel(panel)
 	m.program.Send(tea.ResumeMsg{})
 }
