@@ -3,6 +3,7 @@ package wm
 import (
 	"sort"
 	"strings"
+	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -17,8 +18,9 @@ const (
 // Manager is a window manager that holds multiple windows with z-index,
 // move, and resize support. Each window wraps a tea.Model.
 type Manager struct {
-	windows       []*Window
-	nextID        int
+	mu           sync.Mutex
+	windows      []*Window
+	nextID       int
 	width, height int
 }
 
@@ -29,19 +31,35 @@ func New() *Manager {
 
 // SetSize sets the available screen area for the manager.
 func (m *Manager) SetSize(width, height int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.width = width
 	m.height = height
 }
 
 // Width returns the manager's width.
-func (m *Manager) Width() int { return m.width }
+func (m *Manager) Width() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.width
+}
 
 // Height returns the manager's height.
-func (m *Manager) Height() int { return m.height }
+func (m *Manager) Height() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.height
+}
 
 // Add creates a new window containing the given tea.Model at position (posX, posY)
 // with the given dimensions. Returns the window ID.
 func (m *Manager) Add(content tea.Model, title string, posX, posY, width, height int) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	winID := m.nextID
 	m.nextID++
 
@@ -62,6 +80,9 @@ func (m *Manager) Add(content tea.Model, title string, posX, posY, width, height
 
 // Remove removes a window by ID.
 func (m *Manager) Remove(winID int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	for i, win := range m.windows {
 		if win.ID == winID {
 			m.windows = append(m.windows[:i], m.windows[i+1:]...)
@@ -78,6 +99,14 @@ func (m *Manager) Remove(winID int) {
 
 // Focus brings a window to the front and focuses it.
 func (m *Manager) Focus(winID int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.focus(winID)
+}
+
+// focus is the lock-free internal version of Focus.
+func (m *Manager) focus(winID int) {
 	for _, win := range m.windows {
 		if win.ID == winID {
 			win.Focused = true
@@ -90,6 +119,9 @@ func (m *Manager) Focus(winID int) {
 
 // Move sets a window's position.
 func (m *Manager) Move(winID, posX, posY int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if win := m.get(winID); win != nil {
 		win.X = posX
 		win.Y = posY
@@ -98,6 +130,14 @@ func (m *Manager) Move(winID, posX, posY int) {
 
 // Resize sets a window's dimensions, respecting minimums.
 func (m *Manager) Resize(winID, width, height int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.resize(winID, width, height)
+}
+
+// resize is the lock-free internal version of Resize.
+func (m *Manager) resize(winID, width, height int) {
 	win := m.get(winID)
 	if win == nil {
 		return
@@ -117,6 +157,9 @@ func (m *Manager) Resize(winID, width, height int) {
 
 // SetZIndex sets a window's z-index.
 func (m *Manager) SetZIndex(winID, zIndex int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if win := m.get(winID); win != nil {
 		win.ZIndex = zIndex
 	}
@@ -124,11 +167,22 @@ func (m *Manager) SetZIndex(winID, zIndex int) {
 
 // Get returns a window by ID, or nil if not found.
 func (m *Manager) Get(winID int) *Window {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	return m.get(winID)
 }
 
 // Windows returns all windows sorted by z-index (back to front).
 func (m *Manager) Windows() []*Window {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.sortedWindows()
+}
+
+// sortedWindows is the lock-free internal version of Windows.
+func (m *Manager) sortedWindows() []*Window {
 	sorted := make([]*Window, len(m.windows))
 	copy(sorted, m.windows)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -140,6 +194,9 @@ func (m *Manager) Windows() []*Window {
 
 // Init initializes all windows.
 func (m *Manager) Init() tea.Cmd {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	var cmds []tea.Cmd
 
 	for _, win := range m.windows {
@@ -154,16 +211,20 @@ func (m *Manager) Init() tea.Cmd {
 // Update processes input messages. Mouse events handle drag/resize/focus;
 // Tab cycles window focus; key events are routed only to the focused window.
 func (m *Manager) Update(msg tea.Msg) tea.Cmd {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.SetSize(msg.Width, msg.Height)
+		m.width = msg.Width
+		m.height = msg.Height
 
 		return nil
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyTab {
-			m.CycleFocus()
+			m.cycleFocus()
 
 			return nil
 		}
@@ -188,31 +249,42 @@ func (m *Manager) Update(msg tea.Msg) tea.Cmd {
 
 // CycleFocus moves focus to the next window in z-order.
 func (m *Manager) CycleFocus() {
-	windows := m.Windows()
-	if len(windows) < 2 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.cycleFocus()
+}
+
+// cycleFocus is the lock-free internal version of CycleFocus.
+func (m *Manager) cycleFocus() {
+	sorted := m.sortedWindows()
+	if len(sorted) < 2 {
 		return
 	}
 
-	for i, win := range windows {
+	for i, win := range sorted {
 		if win.Focused {
-			next := windows[(i+1)%len(windows)]
-			m.Focus(next.ID)
+			next := sorted[(i+1)%len(sorted)]
+			m.focus(next.ID)
 
 			return
 		}
 	}
 
-	m.Focus(windows[0].ID)
+	m.focus(sorted[0].ID)
 }
 
 // View composites all visible windows onto a canvas, sorted by z-index.
 // Returns "" when there is nothing to overlay so callers can skip compositing.
 func (m *Manager) View() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
 
-	sorted := m.Windows()
+	sorted := m.sortedWindows()
 
 	// Collect only visible windows; skip compositing entirely if there are none.
 	var visible []*Window
@@ -385,7 +457,7 @@ func (m *Manager) handleMouse(msg tea.MouseMsg) tea.Cmd {
 			if win.resizing {
 				deltaW := mouseX - win.resizeOrigX
 				deltaH := mouseY - win.resizeOrigY
-				m.Resize(win.ID, win.resizeOrigW+deltaW, win.resizeOrigH+deltaH)
+				m.resize(win.ID, win.resizeOrigW+deltaW, win.resizeOrigH+deltaH)
 
 				return nil
 			}
@@ -402,7 +474,7 @@ func (m *Manager) handleMouse(msg tea.MouseMsg) tea.Cmd {
 }
 
 func (m *Manager) handleMousePress(mouseX, mouseY int, msg tea.MouseMsg) tea.Cmd {
-	sorted := m.Windows()
+	sorted := m.sortedWindows()
 
 	for i := len(sorted) - 1; i >= 0; i-- {
 		win := sorted[i]
@@ -410,7 +482,7 @@ func (m *Manager) handleMousePress(mouseX, mouseY int, msg tea.MouseMsg) tea.Cmd
 			continue
 		}
 
-		m.Focus(win.ID)
+		m.focus(win.ID)
 
 		if win.InTitleBar(mouseX, mouseY) {
 			win.dragging = true

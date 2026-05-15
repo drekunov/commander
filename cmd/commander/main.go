@@ -14,25 +14,26 @@ import (
 )
 
 func main() {
-	err := Run()
-	if err != nil {
-		log.Print(err)
+	if err := Run(); err != nil {
+		log.Fatal(err)
 	}
 }
 
 func Run() error {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	fsConn := filesystem.New()
 
 	uiInstance := ui.New()
 	appInstance := app.New(uiInstance, fsConn)
 
-	errGr, ctx := errgroup.WithContext(ctx)
+	errGr, _ := errgroup.WithContext(context.Background())
 
 	errGr.Go(func() error {
 		err := uiInstance.Run()
-		if err != nil {
+		cancel()
+		if err != nil && !errors.Is(err, tea.ErrInterrupted) {
 			return fmt.Errorf("could not start ui: %w", err)
 		}
 
@@ -49,7 +50,7 @@ func Run() error {
 	})
 
 	err := errGr.Wait()
-	if err != nil && !errors.Is(err, tea.ErrInterrupted) {
+	if err != nil {
 		return fmt.Errorf("exiting app: %w", err)
 	}
 

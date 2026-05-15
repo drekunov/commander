@@ -52,7 +52,7 @@ func (w *Window) InTitleBar(sx, sy int) bool {
 	return sy == w.Y && sx >= w.X && sx < w.X+w.Width
 }
 
-// InResizeGrip returns true if the coordinate is on the bottom-right resize corner.
+// InResizeGrip returns true if the coordinate is on the bottom-right resize grip (◢).
 func (w *Window) InResizeGrip(sx, sy int) bool {
-	return sx >= w.X+w.Width-2 && sy == w.Y+w.Height-1
+	return sx == w.X+w.Width-2 && sy == w.Y+w.Height-1
 }

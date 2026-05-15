@@ -22,7 +22,7 @@ func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -34,7 +34,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m *Model) View() string {
 	button := config.Values.ButtonStyle.
 		Render(m.text)
 
@@ -44,6 +44,7 @@ func (m Model) View() string {
 
 	if m.pressed {
 		button = config.Values.PressedButtonStyle.Render(m.text)
+		m.pressed = false
 	}
 
 	return button
