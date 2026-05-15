@@ -7,8 +7,6 @@ import (
 )
 
 type Model struct {
-	title   string
-	footer  string
 	width   int
 	height  int
 	visible bool
@@ -57,28 +55,12 @@ func (m *Model) View() string {
 	return config.Values.TableStyle.Render(m.tableView.View())
 }
 
-func (m *Model) SetTitle(title string) {
-	m.title = title
-}
-
-func (m *Model) Title() string {
-	return m.title
-}
-
-func (m *Model) SetFooter(footer string) {
-	m.footer = footer
-}
-
-func (m *Model) Footer() string {
-	return m.footer
+func (m *Model) SetVisible(visible bool) {
+	m.visible = visible
 }
 
 func (m *Model) TableView() table.Model {
 	return m.tableView
-}
-
-func (m *Model) SetVisible(visible bool) {
-	m.visible = visible
 }
 
 func (m *Model) SetWidth(width int) {

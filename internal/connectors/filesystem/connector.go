@@ -1,7 +1,6 @@
 package filesystem
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -29,8 +28,6 @@ func (f *FileSystem) Name() string {
 	return connectorName
 }
 
-var ErrDirectoryEmpty = errors.New("directory is empty")
-
 func (f *FileSystem) ReadDir(path string) ([]app.AttributeList, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -38,7 +35,7 @@ func (f *FileSystem) ReadDir(path string) ([]app.AttributeList, error) {
 	}
 
 	if len(entries) == 0 {
-		return nil, ErrDirectoryEmpty
+		return nil, nil
 	}
 
 	attributeList := make([]app.AttributeList, 0, len(entries))

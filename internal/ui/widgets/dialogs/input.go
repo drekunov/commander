@@ -16,7 +16,7 @@ type Input struct {
 	height  int
 	visible bool
 
-	okButton button.Model
+	okButton *button.Model
 	input    textinput.Model
 
 	done chan struct{}
@@ -30,10 +30,12 @@ func NewInput() *Input {
 	input.Width = 20
 	input.Prompt = ""
 
+	okBtn := button.New("Ok", true)
+
 	return &Input{
-		okButton: button.New("Ok", true),
+		okButton: &okBtn,
 		input:    input,
-		done:     make(chan struct{}),
+		done:     make(chan struct{}, 1),
 	}
 }
 
@@ -59,7 +61,7 @@ func (m *Input) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) { //nolint: gocritic
 	case tea.KeyMsg:
-		if msg.Type == tea.KeyEnter {
+		if msg.Type == tea.KeyEnter && m.visible {
 			m.visible = false
 			m.done <- struct{}{}
 		}
@@ -95,8 +97,6 @@ func (m *Input) View() string {
 	footer := m.footerView(lipgloss.Width(output) - 2)
 
 	output = lipgloss.JoinVertical(lipgloss.Center, header, output, footer)
-
-	output = lipgloss.Place(m.width, m.height, 0.1, 0.1, output)
 
 	output = lipgloss.Place(m.width, m.height, 0.2, 0.2, output)
 

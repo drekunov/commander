@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"strconv"
 	"strings"
 
@@ -78,10 +79,16 @@ func ApplyStyle(props map[string]string) lipgloss.Style {
 func parseBox(val string) (int, int, int, int) {
 	parts := strings.Fields(val)
 
-	nums := make([]int, len(parts))
-	for i, part := range parts {
-		parsed, _ := strconv.Atoi(part)
-		nums[i] = parsed
+	nums := make([]int, 0, len(parts))
+	for _, part := range parts {
+		parsed, err := strconv.Atoi(part)
+		if err != nil {
+			log.Printf("config: could not parse box value %q: %v", part, err)
+
+			continue
+		}
+
+		nums = append(nums, parsed)
 	}
 
 	switch len(nums) {
