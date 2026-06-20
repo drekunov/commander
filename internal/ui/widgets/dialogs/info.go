@@ -21,10 +21,8 @@ type Info struct {
 }
 
 func NewInfo() *Info {
-	okBtn := button.New("Ok", true)
-
 	return &Info{
-		okButton: &okBtn,
+		okButton: button.New("Ok", true),
 		done:     make(chan struct{}, 1),
 	}
 }
@@ -121,7 +119,8 @@ func (m *Info) headerView(width int) string {
 		width,
 		lipgloss.Center,
 		" "+m.title+" ",
-		lipgloss.WithWhitespaceChars(borderStyle.Top))
+		lipgloss.WithWhitespaceChars(borderStyle.Top),
+	)
 
 	header = lipgloss.JoinHorizontal(lipgloss.Center, borderStyle.TopLeft, header, borderStyle.TopRight)
 
@@ -138,7 +137,8 @@ func (m *Info) footerView(width int) string {
 		width,
 		lipgloss.Center,
 		" "+m.footer+" ",
-		lipgloss.WithWhitespaceChars(borderStyle.Top))
+		lipgloss.WithWhitespaceChars(borderStyle.Top),
+	)
 
 	footer = lipgloss.JoinHorizontal(lipgloss.Center, borderStyle.BottomLeft, footer, borderStyle.BottomRight)
 

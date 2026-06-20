@@ -11,14 +11,14 @@ type Model struct {
 	focused bool
 }
 
-func New(text string, focused bool) Model {
-	return Model{
+func New(text string, focused bool) *Model {
+	return &Model{
 		text:    text,
 		focused: focused,
 	}
 }
 
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return nil
 }
 

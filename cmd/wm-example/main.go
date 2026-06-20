@@ -74,6 +74,8 @@ func (n *notepad) handleKey(msg tea.KeyMsg) {
 		n.handleBackspace()
 	case tea.KeyRunes:
 		n.lines[n.cur] += string(msg.Runes)
+	default:
+		panic("unhandled default case")
 	}
 }
 
@@ -111,6 +113,8 @@ func (lv *listView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if lv.selected < len(lv.items)-1 {
 				lv.selected++
 			}
+		default:
+			panic("unhandled default case")
 		}
 	}
 

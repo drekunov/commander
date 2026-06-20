@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drekunov/gc/internal/ui/widgets/mainform"
 )
@@ -23,8 +25,11 @@ func New() *Model {
 
 func (m *Model) Run() error {
 	_, err := m.program.Run()
+	if err != nil {
+		return fmt.Errorf("program run failed: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 func (m *Model) Init() tea.Cmd {

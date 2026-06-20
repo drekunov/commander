@@ -30,10 +30,8 @@ func NewInput() *Input {
 	input.Width = 20
 	input.Prompt = ""
 
-	okBtn := button.New("Ok", true)
-
 	return &Input{
-		okButton: &okBtn,
+		okButton: button.New("Ok", true),
 		input:    input,
 		done:     make(chan struct{}, 1),
 	}
@@ -141,7 +139,8 @@ func (m *Input) headerView(width int) string {
 		width,
 		lipgloss.Center,
 		" "+m.title+" ",
-		lipgloss.WithWhitespaceChars(borderStyle.Top))
+		lipgloss.WithWhitespaceChars(borderStyle.Top),
+	)
 
 	header = lipgloss.JoinHorizontal(lipgloss.Center, borderStyle.TopLeft, header, borderStyle.TopRight)
 
@@ -158,7 +157,8 @@ func (m *Input) footerView(width int) string {
 		width,
 		lipgloss.Center,
 		" "+m.footer+" ",
-		lipgloss.WithWhitespaceChars(borderStyle.Top))
+		lipgloss.WithWhitespaceChars(borderStyle.Top),
+	)
 
 	footer = lipgloss.JoinHorizontal(lipgloss.Center, borderStyle.BottomLeft, footer, borderStyle.BottomRight)
 
