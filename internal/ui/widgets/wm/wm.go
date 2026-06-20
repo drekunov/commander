@@ -1,6 +1,7 @@
 package wm
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -18,9 +19,9 @@ const (
 // Manager is a window manager that holds multiple windows with z-index,
 // move, and resize support. Each window wraps a tea.Model.
 type Manager struct {
-	mu           sync.Mutex
-	windows      []*Window
-	nextID       int
+	mu            sync.Mutex
+	windows       []*Window
+	nextID        int
 	width, height int
 }
 
@@ -105,18 +106,6 @@ func (m *Manager) Focus(winID int) {
 	m.focus(winID)
 }
 
-// focus is the lock-free internal version of Focus.
-func (m *Manager) focus(winID int) {
-	for _, win := range m.windows {
-		if win.ID == winID {
-			win.Focused = true
-			win.ZIndex = m.topZIndex() + 1
-		} else {
-			win.Focused = false
-		}
-	}
-}
-
 // Move sets a window's position.
 func (m *Manager) Move(winID, posX, posY int) {
 	m.mu.Lock()
@@ -134,25 +123,6 @@ func (m *Manager) Resize(winID, width, height int) {
 	defer m.mu.Unlock()
 
 	m.resize(winID, width, height)
-}
-
-// resize is the lock-free internal version of Resize.
-func (m *Manager) resize(winID, width, height int) {
-	win := m.get(winID)
-	if win == nil {
-		return
-	}
-
-	if width < minWindowWidth {
-		width = minWindowWidth
-	}
-
-	if height < minWindowHeight {
-		height = minWindowHeight
-	}
-
-	win.Width = width
-	win.Height = height
 }
 
 // SetZIndex sets a window's z-index.
@@ -179,17 +149,6 @@ func (m *Manager) Windows() []*Window {
 	defer m.mu.Unlock()
 
 	return m.sortedWindows()
-}
-
-// sortedWindows is the lock-free internal version of Windows.
-func (m *Manager) sortedWindows() []*Window {
-	sorted := make([]*Window, len(m.windows))
-	copy(sorted, m.windows)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].ZIndex < sorted[j].ZIndex
-	})
-
-	return sorted
 }
 
 // Init initializes all windows.
@@ -255,25 +214,6 @@ func (m *Manager) CycleFocus() {
 	m.cycleFocus()
 }
 
-// cycleFocus is the lock-free internal version of CycleFocus.
-func (m *Manager) cycleFocus() {
-	sorted := m.sortedWindows()
-	if len(sorted) < 2 {
-		return
-	}
-
-	for i, win := range sorted {
-		if win.Focused {
-			next := sorted[(i+1)%len(sorted)]
-			m.focus(next.ID)
-
-			return
-		}
-	}
-
-	m.focus(sorted[0].ID)
-}
-
 // View composites all visible windows onto a canvas, sorted by z-index.
 // Returns "" when there is nothing to overlay so callers can skip compositing.
 func (m *Manager) View() string {
@@ -307,6 +247,67 @@ func (m *Manager) View() string {
 	}
 
 	return cvs.String()
+}
+
+// focus is the lock-free internal version of Focus.
+func (m *Manager) focus(winID int) {
+	for _, win := range m.windows {
+		if win.ID == winID {
+			win.Focused = true
+			win.ZIndex = m.topZIndex() + 1
+		} else {
+			win.Focused = false
+		}
+	}
+}
+
+// resize is the lock-free internal version of Resize.
+func (m *Manager) resize(winID, width, height int) {
+	win := m.get(winID)
+	if win == nil {
+		return
+	}
+
+	if width < minWindowWidth {
+		width = minWindowWidth
+	}
+
+	if height < minWindowHeight {
+		height = minWindowHeight
+	}
+
+	win.Width = width
+	win.Height = height
+}
+
+// sortedWindows is the lock-free internal version of Windows.
+func (m *Manager) sortedWindows() []*Window {
+	sorted := make([]*Window, len(m.windows))
+	copy(sorted, m.windows)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].ZIndex < sorted[j].ZIndex
+	})
+
+	return sorted
+}
+
+// cycleFocus is the lock-free internal version of CycleFocus.
+func (m *Manager) cycleFocus() {
+	sorted := m.sortedWindows()
+	if len(sorted) < 2 {
+		return
+	}
+
+	for i, win := range sorted {
+		if win.Focused {
+			next := sorted[(i+1)%len(sorted)]
+			m.focus(next.ID)
+
+			return
+		}
+	}
+
+	m.focus(sorted[0].ID)
 }
 
 // renderWindow draws a window frame with title bar and content.
@@ -476,7 +477,7 @@ func (m *Manager) handleMouse(msg tea.MouseMsg) tea.Cmd {
 func (m *Manager) handleMousePress(mouseX, mouseY int, msg tea.MouseMsg) tea.Cmd {
 	sorted := m.sortedWindows()
 
-	for i := len(sorted) - 1; i >= 0; i-- {
+	for i := range slices.Backward(sorted) {
 		win := sorted[i]
 		if !win.Visible || !win.Contains(mouseX, mouseY) {
 			continue

@@ -49,7 +49,7 @@ func (m *Model) Password(title, message string) string {
 	return m.Input(context.Background(), title, "", message)
 }
 
-func (m *Model) Select(title, message string, options []string) string {
+func (m *Model) Select(title, message string, Koptions []string) string {
 	m.Info(context.Background(), title, "", message)
 
 	return ""
@@ -81,9 +81,7 @@ func (m *Model) Confirm(title, message string) bool {
 
 	m.program.Send(tea.ResumeMsg{})
 
-	select {
-	case <-input.Done():
-	}
+	<-input.Done()
 
 	return input.Input() == "Y"
 }

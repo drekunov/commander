@@ -14,7 +14,8 @@ import (
 )
 
 func main() {
-	if err := Run(); err != nil {
+	err := Run()
+	if err != nil {
 		log.Fatal(err)
 	}
 }
@@ -32,7 +33,9 @@ func Run() error {
 
 	errGr.Go(func() error {
 		err := uiInstance.Run()
+
 		cancel()
+
 		if err != nil && !errors.Is(err, tea.ErrInterrupted) {
 			return fmt.Errorf("could not start ui: %w", err)
 		}

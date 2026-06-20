@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log"
 )
 
 type App struct {
@@ -19,7 +20,7 @@ func New(ui UI, conn Connector) *App {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	fmt.Println(getBuildInfo())
+	log.Println(getBuildInfo())
 
 	data, err := a.connector.ReadDir("/")
 	if err != nil {
