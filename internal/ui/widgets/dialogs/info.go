@@ -8,22 +8,20 @@ import (
 )
 
 type Info struct {
-	title   string
-	footer  string
-	text    string
-	width   int
-	height  int
-	visible bool
+	dialogBase
+
+	text string
 
 	okButton *button.Model
 
 	done chan struct{}
 }
 
-func NewInfo() *Info {
+func NewInfo(styles config.Styles) *Info {
 	return &Info{
-		okButton: button.New("Ok", true),
-		done:     make(chan struct{}, 1),
+		dialogBase: newDialogBase(styles),
+		okButton:   button.New("Ok", true, styles),
+		done:       make(chan struct{}, 1),
 	}
 }
 
@@ -31,20 +29,12 @@ func (m *Info) Init() tea.Cmd {
 	return nil
 }
 
-func (m *Info) Free() {
-	close(m.done)
-}
-
 func (m *Info) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var (
-		cmds = make([]tea.Cmd, 0, 1)
-		cmd  tea.Cmd
-	)
+	var cmd tea.Cmd
 
 	m.okButton, cmd = m.okButton.Update(msg)
-	cmds = append(cmds, cmd)
 
-	switch msg := msg.(type) { //nolint: gocritic
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyEnter && m.visible {
 			m.visible = false
@@ -52,7 +42,7 @@ func (m *Info) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	return m, tea.Batch(cmds...)
+	return m, cmd
 }
 
 func (m *Info) View() string {
@@ -60,91 +50,19 @@ func (m *Info) View() string {
 		return ""
 	}
 
-	text := config.Values.TextStyle.Render(m.text)
+	text := m.styles.TextStyle.Render(m.text)
 
 	okButton := m.okButton.View()
 
 	output := lipgloss.JoinVertical(lipgloss.Center, text, okButton)
 
-	output = config.Values.DialogBoxStyle.
-		Width(m.width).
-		Height(m.height).
-		Align(lipgloss.Center, lipgloss.Center).
-		BorderTop(false).
-		BorderBottom(false).
-		Render(output)
-
-	header := m.headerView(lipgloss.Width(output) - 2)
-
-	footer := m.footerView(lipgloss.Width(output) - 2)
-
-	output = lipgloss.JoinVertical(lipgloss.Center, header, output, footer)
-
-	output = lipgloss.Place(m.width, m.height, 0.2, 0.2, output)
-
-	return output
-}
-
-func (m *Info) SetTitle(title string) {
-	m.title = title
-}
-
-func (m *Info) SetFooter(footer string) {
-	m.footer = footer
+	return m.render(output)
 }
 
 func (m *Info) SetText(text string) {
 	m.text = text
 }
 
-func (m *Info) SetVisible(visible bool) {
-	m.visible = visible
-}
-
-func (m *Info) SetWidth(width int) {
-	m.width = width
-}
-
-func (m *Info) SetHeight(height int) {
-	m.height = height
-}
-
 func (m *Info) Done() chan struct{} {
 	return m.done
-}
-
-func (m *Info) headerView(width int) string {
-	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
-	header := lipgloss.PlaceHorizontal(
-		width,
-		lipgloss.Center,
-		" "+m.title+" ",
-		lipgloss.WithWhitespaceChars(borderStyle.Top),
-	)
-
-	header = lipgloss.JoinHorizontal(lipgloss.Center, borderStyle.TopLeft, header, borderStyle.TopRight)
-
-	header = lipgloss.NewStyle().
-		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground()).
-		Render(header)
-
-	return header
-}
-
-func (m *Info) footerView(width int) string {
-	borderStyle := config.Values.DialogBoxStyle.GetBorderStyle()
-	footer := lipgloss.PlaceHorizontal(
-		width,
-		lipgloss.Center,
-		" "+m.footer+" ",
-		lipgloss.WithWhitespaceChars(borderStyle.Top),
-	)
-
-	footer = lipgloss.JoinHorizontal(lipgloss.Center, borderStyle.BottomLeft, footer, borderStyle.BottomRight)
-
-	footer = lipgloss.NewStyle().
-		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground()).
-		Render(footer)
-
-	return footer
 }

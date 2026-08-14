@@ -10,7 +10,7 @@ import (
 //go:embed styles.css
 var defaultCSS string
 
-type Config struct {
+type Styles struct {
 	ButtonStyle        lipgloss.Style
 	ActiveButtonStyle  lipgloss.Style
 	PressedButtonStyle lipgloss.Style
@@ -20,9 +20,10 @@ type Config struct {
 	TableStyle         lipgloss.Style
 }
 
-var Values Config
-
-func init() {
+// LoadStyles builds the theme, applying a styles.css override from the
+// process working directory when present and falling back to the embedded
+// default otherwise.
+func LoadStyles() (Styles, error) {
 	cssData := defaultCSS
 
 	data, err := os.ReadFile("styles.css")
@@ -32,7 +33,7 @@ func init() {
 
 	stylesheet := ParseCSS(cssData)
 
-	Values = Config{
+	return Styles{
 		ButtonStyle:        ApplyStyle(stylesheet[".button"]),
 		ActiveButtonStyle:  ApplyStyle(stylesheet[".active-button"]),
 		PressedButtonStyle: ApplyStyle(stylesheet[".pressed-button"]),
@@ -40,5 +41,5 @@ func init() {
 		TextStyle:          ApplyStyle(stylesheet[".text"]),
 		InputStyle:         ApplyStyle(stylesheet[".input"]),
 		TableStyle:         ApplyStyle(stylesheet[".table"]),
-	}
+	}, nil
 }

@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/drekunov/gc/internal/config"
 	"github.com/drekunov/gc/internal/ui/widgets/wm"
 )
 
@@ -165,7 +166,12 @@ type app struct {
 }
 
 func newApp() *app {
-	mgr := wm.New()
+	styles, err := config.LoadStyles()
+	if err != nil {
+		log.Fatal(fmt.Errorf("could not load styles: %w", err))
+	}
+
+	mgr := wm.New(styles)
 
 	mgr.Add(
 		newNotepad("notes", "Hello from the window manager!\nTry clicking other windows.\nType here to edit."),

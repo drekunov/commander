@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drekunov/gc/internal/app"
+	"github.com/drekunov/gc/internal/config"
 	"github.com/drekunov/gc/internal/connectors/filesystem"
 	"github.com/drekunov/gc/internal/ui"
 	"golang.org/x/sync/errgroup"
@@ -24,9 +25,14 @@ func Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	styles, err := config.LoadStyles()
+	if err != nil {
+		return fmt.Errorf("could not load styles: %w", err)
+	}
+
 	fsConn := filesystem.New()
 
-	uiInstance := ui.New()
+	uiInstance := ui.New(styles)
 	appInstance := app.New(uiInstance, fsConn)
 
 	errGr, _ := errgroup.WithContext(context.Background())
@@ -52,7 +58,7 @@ func Run() error {
 		return nil
 	})
 
-	err := errGr.Wait()
+	err = errGr.Wait()
 	if err != nil {
 		return fmt.Errorf("exiting app: %w", err)
 	}
