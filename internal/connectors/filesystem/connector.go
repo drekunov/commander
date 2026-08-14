@@ -38,7 +38,14 @@ func (f *FileSystem) ReadDir(path string) ([]app.AttributeList, error) {
 		return nil, nil
 	}
 
-	attributeList := make([]app.AttributeList, 0, len(entries))
+	attributeList := make([]app.AttributeList, 0, len(entries)+1)
+
+	attributeList = append(attributeList, app.AttributeList{
+		{AttrName: "path", AttrValue: "path"},
+		{AttrName: "Name", AttrValue: "Name"},
+		{AttrName: "IsDir", AttrValue: "IsDir"},
+		{AttrName: "Type", AttrValue: "Type"},
+	})
 
 	for _, entry := range entries {
 		attrs := make(app.AttributeList, 0, 4)
