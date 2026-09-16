@@ -27,6 +27,7 @@ func (m *Model) Info(ctx context.Context, title, footer, message string) {
 
 	select {
 	case <-ctx.Done():
+	case <-m.quit:
 	case <-about.Done():
 	}
 }
@@ -54,6 +55,8 @@ func (m *Model) runInput(ctx context.Context, title, footer, message string, ech
 	select {
 	case <-ctx.Done():
 		return ""
+	case <-m.quit:
+		return ""
 	case <-input.Done():
 		return input.Input()
 	}
@@ -72,6 +75,8 @@ func (m *Model) Select(ctx context.Context, title, message string, options []str
 
 	select {
 	case <-ctx.Done():
+		return ""
+	case <-m.quit:
 		return ""
 	case <-sel.Done():
 		return sel.Selection()
@@ -92,6 +97,8 @@ func (m *Model) SelectMultiple(ctx context.Context, title, message string, optio
 	select {
 	case <-ctx.Done():
 		return nil
+	case <-m.quit:
+		return nil
 	case <-sel.Done():
 		return sel.Selections()
 	}
@@ -109,6 +116,8 @@ func (m *Model) Confirm(ctx context.Context, title, message string) bool {
 
 	select {
 	case <-ctx.Done():
+		return false
+	case <-m.quit:
 		return false
 	case <-confirm.Done():
 		return confirm.Decision()
