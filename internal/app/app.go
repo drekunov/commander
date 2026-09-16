@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"log"
+	"sync"
 )
 
 // NavRequest asks the app to read a directory and deliver it to a panel.
@@ -11,33 +12,54 @@ type NavRequest struct {
 	Dir   string
 }
 
-const (
-	navChannelSize = 8
-	rootDir        = "/"
-)
+const rootDir = "/"
 
 type App struct {
 	ui        UI
 	connector Connector
 
-	navCh chan NavRequest
+	// navMu guards pending, the single latest navigation request. A newer
+	// request replaces an older one instead of being dropped.
+	navMu   sync.Mutex
+	pending *NavRequest
+	navSig  chan struct{}
 }
 
 func New(ui UI, conn Connector) *App {
 	return &App{
 		ui:        ui,
 		connector: conn,
-		navCh:     make(chan NavRequest, navChannelSize),
+		navSig:    make(chan struct{}, 1),
 	}
 }
 
-// Navigate enqueues a navigation request for the given panel. It is
-// non-blocking so the UI event loop is never stalled by a full queue.
+// Navigate stores the latest navigation request and wakes the run loop. It is
+// non-blocking and never discards the newest request.
 func (a *App) Navigate(panel PanelID, dir string) {
+	a.navMu.Lock()
+	a.pending = &NavRequest{Panel: panel, Dir: dir}
+	a.navMu.Unlock()
+
 	select {
-	case a.navCh <- NavRequest{Panel: panel, Dir: dir}:
+	case a.navSig <- struct{}{}:
 	default:
 	}
+}
+
+// takePending returns and clears the latest request, reporting whether one was
+// waiting.
+func (a *App) takePending() (NavRequest, bool) {
+	a.navMu.Lock()
+	defer a.navMu.Unlock()
+
+	if a.pending == nil {
+		return NavRequest{}, false
+	}
+
+	nav := *a.pending
+	a.pending = nil
+
+	return nav, true
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -52,8 +74,10 @@ func (a *App) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 
-		case nav := <-a.navCh:
-			a.handleNav(nav)
+		case <-a.navSig:
+			if nav, ok := a.takePending(); ok {
+				a.handleNav(nav)
+			}
 		}
 	}
 }

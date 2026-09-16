@@ -25,9 +25,9 @@
 
 ## 5. Reliable navigation (D6)
 
-- [ ] 5.1 Replace the `select`/`default` drop in `App.Navigate` with a mutex-protected latest-request slot plus a signal channel.
-- [ ] 5.2 Drain the latest-request slot in `App.Run` under the mutex.
-- [ ] 5.3 Verify the event loop never blocks and the newest request is always honored.
+- [x] 5.1 Replace the `select`/`default` drop in `App.Navigate` with a mutex-protected latest-request slot plus a signal channel.
+- [x] 5.2 Drain the latest-request slot in `App.Run` under the mutex.
+- [x] 5.3 Verify the event loop never blocks and the newest request is always honored.
 
 ## 6. Panel matching, complexity, and accessors (D8, D9, D10)
 

@@ -227,6 +227,40 @@ func TestNavigateDeliversToRequestedPanel(t *testing.T) {
 	}
 }
 
+func TestNavigateKeepsLatestRequest(t *testing.T) {
+	t.Parallel()
+
+	uiFake := newFakeUI()
+	connFake := newFakeConnector()
+	connFake.dirs["/"] = rows("etc")
+	connFake.dirs["/a"] = rows("a")
+	connFake.dirs["/b"] = rows("b")
+	connFake.dirs["/c"] = rows("c")
+
+	appInstance := app.New(uiFake, connFake)
+	runApp(t, appInstance)
+
+	waitForData(t, uiFake) // left
+	waitForData(t, uiFake) // right
+
+	for _, dir := range []string{"/a", "/b", "/c"} {
+		appInstance.Navigate(app.PanelRight, dir)
+	}
+
+	deadline := time.After(2 * time.Second)
+
+	for {
+		select {
+		case call := <-uiFake.dataCh:
+			if call.panel == app.PanelRight && call.dir == "/c" {
+				return
+			}
+		case <-deadline:
+			t.Fatal("latest navigation request /c was not delivered")
+		}
+	}
+}
+
 func TestNavigateErrorShowsDialogAndKeepsListing(t *testing.T) {
 	t.Parallel()
 
