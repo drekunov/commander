@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drekunov/gc/internal/app"
@@ -30,6 +31,11 @@ type Model struct {
 	// quit is closed when the tea program exits so goroutines that show
 	// dialogs never outlive the application.
 	quit chan struct{}
+
+	// mockMu guards the single mock dialog shared by repeated bar activations.
+	mockMu     sync.Mutex
+	mockDialog *dialogs.Info
+	mockWinID  int
 }
 
 func New(styles config.Styles) *Model {
@@ -110,29 +116,62 @@ func (m *Model) handleBarActivation(action buttonbar.Action) tea.Cmd {
 		return tea.Quit
 	}
 
-	go m.mockInfo(action)
+	m.showMock(action)
 
 	return nil
 }
 
-// mockInfo shows the placeholder Info dialog for a not-yet-implemented bar
-// action. The dialog flow blocks, so it runs on a goroutine and unblocks as
-// soon as the lifecycle channel closes (quit never leaks it).
-func (m *Model) mockInfo(action buttonbar.Action) {
+// showMock reports a not-yet-implemented bar action. Only one mock dialog is
+// kept open: a later activation updates the existing dialog's text in place
+// instead of stacking another window and goroutine. Runs on the event loop.
+func (m *Model) showMock(action buttonbar.Action) {
+	text := action.Name() + " is not implemented yet"
+
+	m.mockMu.Lock()
+	if m.mockDialog != nil {
+		m.mockDialog.SetText(text)
+		m.mockMu.Unlock()
+
+		m.sendMsg(tea.ResumeMsg{})
+
+		return
+	}
+
 	info := dialogs.NewInfo(m.styles)
-	info.SetText(action.Name() + " is not implemented yet")
+	info.SetText(text)
 	info.SetTitle("Mock")
 	info.SetVisible(true)
 
-	id := m.addDialogWindow(info, "Mock")
-	defer m.main.WM().Remove(id)
+	m.mockDialog = info
+	m.mockWinID = m.addDialogWindow(info, "Mock")
+	m.mockMu.Unlock()
 
 	m.sendMsg(tea.ResumeMsg{})
 
+	go m.waitMock(info)
+}
+
+// waitMock releases the mock dialog when it is dismissed or the application
+// quits, clearing the tracked reference and removing its window.
+func (m *Model) waitMock(info *dialogs.Info) {
 	select {
 	case <-m.quit:
 	case <-info.Done():
 	}
+
+	m.mockMu.Lock()
+	if m.mockDialog != info {
+		m.mockMu.Unlock()
+
+		return
+	}
+
+	id := m.mockWinID
+	m.mockDialog = nil
+	m.mockWinID = 0
+	m.mockMu.Unlock()
+
+	m.main.WM().Remove(id)
 }
 
 // handleNavigate forwards a panel navigation request to the app's directory

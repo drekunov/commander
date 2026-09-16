@@ -19,9 +19,9 @@
 
 ## 4. Mock dialog coalescing (D5)
 
-- [ ] 4.1 Track the open mock dialog and its window id on `ui.Model`.
-- [ ] 4.2 On activation, update the existing mock dialog text in place when one is open; otherwise create it.
-- [ ] 4.3 Clear the tracked reference when the mock goroutine finishes (quit or `Done()`).
+- [x] 4.1 Track the open mock dialog and its window id on `ui.Model`.
+- [x] 4.2 On activation, update the existing mock dialog text in place when one is open; otherwise create it.
+- [x] 4.3 Clear the tracked reference when the mock goroutine finishes (quit or `Done()`).
 
 ## 5. Reliable navigation (D6)
 
