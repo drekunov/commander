@@ -16,6 +16,10 @@ const (
 	defaultColumnWidth = 12
 	parentLabel        = ".."
 	parentIsDirValue   = "true"
+
+	attrName  = "Name"
+	attrIsDir = "IsDir"
+	attrPath  = "path"
 )
 
 // ncTableStyles returns the table styles matching the Norton Commander look:
@@ -241,7 +245,7 @@ func attrValue(entry app.AttributeList, name string) (any, bool) {
 }
 
 func entryName(entry app.AttributeList) string {
-	value, ok := attrValue(entry, "Name")
+	value, ok := attrValue(entry, attrName)
 	if !ok {
 		return ""
 	}
@@ -250,7 +254,7 @@ func entryName(entry app.AttributeList) string {
 }
 
 func entryIsDir(entry app.AttributeList) bool {
-	value, ok := attrValue(entry, "IsDir")
+	value, ok := attrValue(entry, attrIsDir)
 	if !ok {
 		return false
 	}
@@ -311,7 +315,7 @@ func (m *Model) displayRowsFor(entries []app.AttributeList) []table.Row {
 func (m *Model) setDefaultColumns() {
 	titles := m.colTitles
 	if len(titles) == 0 {
-		titles = []string{"Name"}
+		titles = []string{attrName}
 	}
 
 	cols := make([]table.Column, 0, len(titles))
@@ -343,21 +347,18 @@ func titleIndex(titles []string, name string) int {
 func (m *Model) parentRow() table.Row {
 	titles := m.colTitles
 	if len(titles) == 0 {
-		titles = []string{"Name"}
+		titles = []string{attrName}
 	}
 
 	row := make(table.Row, len(titles))
 
-	nameIdx := titleIndex(titles, "name")
-	if nameIdx < 0 {
-		nameIdx = 0
-	}
+	nameIdx := max(titleIndex(titles, attrName), 0)
 
-	if idx := titleIndex(titles, "isdir"); idx >= 0 {
+	if idx := titleIndex(titles, attrIsDir); idx >= 0 {
 		row[idx] = parentIsDirValue
 	}
 
-	if idx := titleIndex(titles, "path"); idx >= 0 {
+	if idx := titleIndex(titles, attrPath); idx >= 0 {
 		row[idx] = m.dir
 	}
 

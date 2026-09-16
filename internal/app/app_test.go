@@ -11,6 +11,12 @@ import (
 
 var errBoom = errors.New("boom")
 
+const (
+	attrPath  = "path"
+	attrName  = "Name"
+	attrIsDir = "IsDir"
+)
+
 type setDataCall struct {
 	panel app.PanelID
 	dir   string
@@ -135,18 +141,19 @@ func waitForData(t *testing.T, uiFake *fakeUI) setDataCall {
 
 func rows(names ...string) []app.AttributeList {
 	header := app.AttributeList{
-		{AttrName: "path", AttrValue: "path"},
-		{AttrName: "Name", AttrValue: "Name"},
-		{AttrName: "IsDir", AttrValue: "IsDir"},
+		{AttrName: attrPath, AttrValue: attrPath},
+		{AttrName: attrName, AttrValue: attrName},
+		{AttrName: attrIsDir, AttrValue: attrIsDir},
 	}
 
-	out := []app.AttributeList{header}
+	out := make([]app.AttributeList, 0, 1+len(names))
+	out = append(out, header)
 
 	for _, name := range names {
 		out = append(out, app.AttributeList{
-			{AttrName: "path", AttrValue: "/"},
-			{AttrName: "Name", AttrValue: name},
-			{AttrName: "IsDir", AttrValue: false},
+			{AttrName: attrPath, AttrValue: "/"},
+			{AttrName: attrName, AttrValue: name},
+			{AttrName: attrIsDir, AttrValue: false},
 		})
 	}
 

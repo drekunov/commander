@@ -11,6 +11,12 @@ import (
 	"github.com/drekunov/gc/internal/ui/widgets/panel"
 )
 
+const (
+	attrName  = "Name"
+	attrIsDir = "IsDir"
+	etcDir    = "/etc"
+)
+
 func resizeMainform(m *mainform.Model) *mainform.Model {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -117,17 +123,16 @@ func TestPressAboveBarReachesWmAndClearsBarFocus(t *testing.T) {
 }
 
 func listingFor(names ...string) []app.AttributeList {
-	data := []app.AttributeList{
-		{
-			{AttrName: "Name", AttrValue: "Name"},
-			{AttrName: "IsDir", AttrValue: "IsDir"},
-		},
-	}
+	data := make([]app.AttributeList, 0, 1+len(names))
+	data = append(data, app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName},
+		{AttrName: attrIsDir, AttrValue: attrIsDir},
+	})
 
 	for _, name := range names {
 		data = append(data, app.AttributeList{
-			{AttrName: "Name", AttrValue: name},
-			{AttrName: "IsDir", AttrValue: false},
+			{AttrName: attrName, AttrValue: name},
+			{AttrName: attrIsDir, AttrValue: false},
 		})
 	}
 
@@ -142,7 +147,7 @@ func TestDataMsgRoutesToAddressedPanel(t *testing.T) {
 
 	_, cmd := model.Update(panel.DataMsg{
 		Panel: app.PanelRight,
-		Path:  "/etc",
+		Path:  etcDir,
 		Data:  listingFor("hosts"),
 	})
 
@@ -159,10 +164,10 @@ func TestDataMsgRoutesToAddressedPanel(t *testing.T) {
 		}
 
 		switch content.Dir() {
-		case "/etc":
+		case etcDir:
 			rightUpdated = true
 
-			if win.Title != "/etc" {
+			if win.Title != etcDir {
 				t.Errorf("right window title = %q, want /etc", win.Title)
 			}
 		case "":

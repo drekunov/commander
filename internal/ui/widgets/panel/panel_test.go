@@ -11,6 +11,12 @@ import (
 	"github.com/drekunov/gc/internal/config"
 )
 
+const (
+	attrNameLower  = "name"
+	attrIsDirLower = "isdir"
+	subName        = "sub"
+)
+
 // testListing builds a listing whose entries are files unless their name
 // carries the "d:" marker, in which case they are directories.
 func mustPanelModel(t *testing.T, model tea.Model) *Model {
@@ -25,12 +31,11 @@ func mustPanelModel(t *testing.T, model tea.Model) *Model {
 }
 
 func testListing(names ...string) []app.AttributeList {
-	data := []app.AttributeList{
-		{
-			{AttrName: "Name", AttrValue: "Name"},
-			{AttrName: "IsDir", AttrValue: "IsDir"},
-		},
-	}
+	data := make([]app.AttributeList, 0, 1+len(names))
+	data = append(data, app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName},
+		{AttrName: attrIsDir, AttrValue: attrIsDir},
+	})
 
 	for _, name := range names {
 		isDir := strings.HasPrefix(name, "d:")
@@ -39,8 +44,8 @@ func testListing(names ...string) []app.AttributeList {
 		}
 
 		data = append(data, app.AttributeList{
-			{AttrName: "Name", AttrValue: name},
-			{AttrName: "IsDir", AttrValue: isDir},
+			{AttrName: attrName, AttrValue: name},
+			{AttrName: attrIsDir, AttrValue: isDir},
 		})
 	}
 
@@ -54,16 +59,16 @@ func TestSetData(t *testing.T) {
 
 	data := []app.AttributeList{
 		{
-			{AttrName: "Name", AttrValue: "Name"},
-			{AttrName: "IsDir", AttrValue: "IsDir"},
+			{AttrName: attrName, AttrValue: attrName},
+			{AttrName: attrIsDir, AttrValue: attrIsDir},
 		},
 		{
-			{AttrName: "Name", AttrValue: "a.txt"},
-			{AttrName: "IsDir", AttrValue: "false"},
+			{AttrName: attrName, AttrValue: "a.txt"},
+			{AttrName: attrIsDir, AttrValue: "false"},
 		},
 		{
-			{AttrName: "Name", AttrValue: "sub"},
-			{AttrName: "IsDir", AttrValue: "true"},
+			{AttrName: attrName, AttrValue: subName},
+			{AttrName: attrIsDir, AttrValue: "true"},
 		},
 	}
 
@@ -74,7 +79,7 @@ func TestSetData(t *testing.T) {
 		t.Fatalf("expected 2 columns, got %d", len(cols))
 	}
 
-	if cols[0].Title != "Name" {
+	if cols[0].Title != attrName {
 		t.Errorf("cols[0].Title = %q, want Name", cols[0].Title)
 	}
 
@@ -87,7 +92,7 @@ func TestSetData(t *testing.T) {
 		t.Errorf("first entry not rendered: rows[0][0] = %q", rows[0][0])
 	}
 
-	if rows[1][0] != "sub" {
+	if rows[1][0] != subName {
 		t.Errorf("rows[1][0] = %q, want sub", rows[1][0])
 	}
 
@@ -342,12 +347,12 @@ func TestAttributeMatchingIsCaseInsensitive(t *testing.T) {
 
 	data := []app.AttributeList{
 		{
-			{AttrName: "name", AttrValue: "name"},
-			{AttrName: "isdir", AttrValue: "isdir"},
+			{AttrName: attrNameLower, AttrValue: attrNameLower},
+			{AttrName: attrIsDirLower, AttrValue: attrIsDirLower},
 		},
 		{
-			{AttrName: "name", AttrValue: "sub"},
-			{AttrName: "isdir", AttrValue: true},
+			{AttrName: attrNameLower, AttrValue: subName},
+			{AttrName: attrIsDirLower, AttrValue: true},
 		},
 	}
 
