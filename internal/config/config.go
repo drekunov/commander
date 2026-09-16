@@ -18,6 +18,7 @@ type Styles struct {
 	TextStyle          lipgloss.Style
 	InputStyle         lipgloss.Style
 	TableStyle         lipgloss.Style
+	ButtonBarStyle     lipgloss.Style
 }
 
 // LoadStyles builds the theme, applying a styles.css override from the
@@ -41,5 +42,6 @@ func LoadStyles() (Styles, error) {
 		TextStyle:          ApplyStyle(stylesheet[".text"]),
 		InputStyle:         ApplyStyle(stylesheet[".input"]),
 		TableStyle:         ApplyStyle(stylesheet[".table"]),
+		ButtonBarStyle:     ApplyStyle(stylesheet[".button-bar"]),
 	}, nil
 }

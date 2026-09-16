@@ -9,20 +9,35 @@ import (
 	"github.com/drekunov/gc/internal/app"
 )
 
-var errReadDir = errors.New("boom")
+var errBoom = errors.New("boom")
 
-type fakeUI struct {
-	infoCalls chan string
-	data      chan []app.AttributeList
+type setDataCall struct {
+	panel app.PanelID
+	dir   string
+	data  []app.AttributeList
 }
 
-func (f *fakeUI) Info(_ context.Context, title, _, _ string) {
-	if f.infoCalls != nil {
-		f.infoCalls <- title
+type fakeUI struct {
+	infoCh chan string
+	errCh  chan string
+	dataCh chan setDataCall
+}
+
+func newFakeUI() *fakeUI {
+	return &fakeUI{
+		infoCh: make(chan string, 16),
+		errCh:  make(chan string, 16),
+		dataCh: make(chan setDataCall, 16),
 	}
 }
 
-func (f *fakeUI) Error(_, _ string) {}
+func (f *fakeUI) Info(_ context.Context, title, _, _ string) {
+	f.infoCh <- title
+}
+
+func (f *fakeUI) Error(title, _ string) {
+	f.errCh <- title
+}
 
 func (f *fakeUI) Warning(_, _ string) {}
 
@@ -46,43 +61,44 @@ func (f *fakeUI) SelectMultiple(_ context.Context, _, _ string, _ []string) []st
 	return nil
 }
 
-func (f *fakeUI) SetData(data []app.AttributeList) {
-	if f.data != nil {
-		f.data <- data
-	}
+func (f *fakeUI) SetData(panel app.PanelID, dir string, data []app.AttributeList) {
+	f.dataCh <- setDataCall{panel: panel, dir: dir, data: data}
 }
 
 type fakeConnector struct {
-	rows []app.AttributeList
-	err  error
+	dirs map[string][]app.AttributeList
+	errs map[string]error
+}
+
+func newFakeConnector() *fakeConnector {
+	return &fakeConnector{
+		dirs: map[string][]app.AttributeList{},
+		errs: map[string]error{},
+	}
 }
 
 func (f *fakeConnector) Name() string {
 	return "Fake"
 }
 
-func (f *fakeConnector) ReadDir(string) ([]app.AttributeList, error) {
-	if f.err != nil {
-		return nil, f.err
+func (f *fakeConnector) ReadDir(path string) ([]app.AttributeList, error) {
+	err := f.errs[path]
+	if err != nil {
+		return nil, err
 	}
 
-	return f.rows, nil
+	return f.dirs[path], nil
 }
 
 func (f *fakeConnector) ReadFile(string) ([]byte, error) {
 	return nil, nil
 }
 
-func TestRunShowsDialogOnReadDirError(t *testing.T) {
-	t.Parallel()
-
-	uiFake := &fakeUI{infoCalls: make(chan string, 1)}
-	connFake := &fakeConnector{err: errReadDir}
+// runApp starts the app and cancels it when the test finishes.
+func runApp(t *testing.T, appInstance *app.App) {
+	t.Helper()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	appInstance := app.New(uiFake, connFake)
 
 	errCh := make(chan error, 1)
 
@@ -90,60 +106,152 @@ func TestRunShowsDialogOnReadDirError(t *testing.T) {
 		errCh <- appInstance.Run(ctx)
 	}()
 
-	select {
-	case title := <-uiFake.infoCalls:
-		if title != connFake.Name() {
-			t.Errorf("info dialog title = %q, want connector name", title)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("info dialog was not shown on read error")
-	}
+	t.Cleanup(func() {
+		cancel()
 
-	err := <-errCh
-	if err == nil {
-		t.Error("Run should return an error when ReadDir fails")
+		select {
+		case err := <-errCh:
+			if err != nil {
+				t.Errorf("Run returned error: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Error("Run did not return after context cancellation")
+		}
+	})
+}
+
+func waitForData(t *testing.T, uiFake *fakeUI) setDataCall {
+	t.Helper()
+
+	select {
+	case call := <-uiFake.dataCh:
+		return call
+	case <-time.After(2 * time.Second):
+		t.Fatal("SetData was not called")
+
+		return setDataCall{}
 	}
 }
 
-func TestRunSetDataOnSuccess(t *testing.T) {
+func rows(names ...string) []app.AttributeList {
+	header := app.AttributeList{
+		{AttrName: "path", AttrValue: "path"},
+		{AttrName: "Name", AttrValue: "Name"},
+		{AttrName: "IsDir", AttrValue: "IsDir"},
+	}
+
+	out := []app.AttributeList{header}
+
+	for _, name := range names {
+		out = append(out, app.AttributeList{
+			{AttrName: "path", AttrValue: "/"},
+			{AttrName: "Name", AttrValue: name},
+			{AttrName: "IsDir", AttrValue: false},
+		})
+	}
+
+	return out
+}
+
+func TestRunDeliversRootToBothPanels(t *testing.T) {
 	t.Parallel()
 
-	rows := []app.AttributeList{
-		{{AttrName: "Name", AttrValue: "Name"}},
-		{{AttrName: "Name", AttrValue: "a.txt"}},
+	uiFake := newFakeUI()
+	connFake := newFakeConnector()
+	connFake.dirs["/"] = rows("etc", "tmp")
+
+	runApp(t, app.New(uiFake, connFake))
+
+	left := waitForData(t, uiFake)
+	if left.panel != app.PanelLeft || left.dir != "/" {
+		t.Errorf("first delivery = %v %q, want left panel at /", left.panel, left.dir)
 	}
 
-	uiFake := &fakeUI{data: make(chan []app.AttributeList, 1)}
-	connFake := &fakeConnector{rows: rows}
+	right := waitForData(t, uiFake)
+	if right.panel != app.PanelRight || right.dir != "/" {
+		t.Errorf("second delivery = %v %q, want right panel at /", right.panel, right.dir)
+	}
+}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func TestRunStartupReadErrorShowsInfoAndKeepsRunning(t *testing.T) {
+	t.Parallel()
+
+	uiFake := newFakeUI()
+	connFake := newFakeConnector()
+	connFake.errs["/"] = errBoom
+
+	runApp(t, app.New(uiFake, connFake))
+
+	for range 2 {
+		select {
+		case <-uiFake.infoCh:
+		case <-time.After(2 * time.Second):
+			t.Fatal("info dialog was not shown for the startup read error")
+		}
+	}
+
+	select {
+	case call := <-uiFake.dataCh:
+		t.Errorf("SetData was called after startup errors: %+v", call)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestNavigateDeliversToRequestedPanel(t *testing.T) {
+	t.Parallel()
+
+	uiFake := newFakeUI()
+	connFake := newFakeConnector()
+	connFake.dirs["/"] = rows("etc")
+	connFake.dirs["/etc"] = rows("hosts")
 
 	appInstance := app.New(uiFake, connFake)
+	runApp(t, appInstance)
 
-	errCh := make(chan error, 1)
+	waitForData(t, uiFake) // left
+	waitForData(t, uiFake) // right
 
-	go func() {
-		errCh <- appInstance.Run(ctx)
-	}()
+	appInstance.Navigate(app.PanelRight, "/etc")
 
-	select {
-	case got := <-uiFake.data:
-		if len(got) != 2 {
-			t.Errorf("SetData received %d rows, want 2", len(got))
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("SetData was not called")
+	call := waitForData(t, uiFake)
+	if call.panel != app.PanelRight {
+		t.Errorf("navigate delivered to panel %v, want right", call.panel)
 	}
 
-	cancel()
+	if call.dir != "/etc" {
+		t.Errorf("navigate delivered dir %q, want /etc", call.dir)
+	}
+
+	if len(call.data) != 2 {
+		t.Errorf("navigate delivered %d rows, want 2", len(call.data))
+	}
+}
+
+func TestNavigateErrorShowsDialogAndKeepsListing(t *testing.T) {
+	t.Parallel()
+
+	uiFake := newFakeUI()
+	connFake := newFakeConnector()
+	connFake.dirs["/"] = rows("etc")
+	connFake.errs["/secret"] = errBoom
+
+	appInstance := app.New(uiFake, connFake)
+	runApp(t, appInstance)
+
+	waitForData(t, uiFake)
+	waitForData(t, uiFake)
+
+	appInstance.Navigate(app.PanelRight, "/secret")
 
 	select {
-	case err := <-errCh:
-		if err != nil {
-			t.Errorf("Run returned error: %v", err)
-		}
+	case <-uiFake.errCh:
 	case <-time.After(2 * time.Second):
-		t.Fatal("Run did not return after context cancellation")
+		t.Fatal("error dialog was not shown for an unreadable directory")
+	}
+
+	select {
+	case call := <-uiFake.dataCh:
+		t.Errorf("SetData was called after a failed navigation: %+v", call)
+	case <-time.After(200 * time.Millisecond):
 	}
 }

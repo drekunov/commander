@@ -2,6 +2,14 @@ package app
 
 import "context"
 
+// PanelID identifies one of the two file panels a listing is delivered to.
+type PanelID int
+
+const (
+	PanelLeft PanelID = iota
+	PanelRight
+)
+
 type UI interface {
 	Dialog
 	Panel
@@ -19,5 +27,5 @@ type Dialog interface {
 }
 
 type Panel interface {
-	SetData(data []AttributeList)
+	SetData(panel PanelID, dir string, data []AttributeList)
 }
