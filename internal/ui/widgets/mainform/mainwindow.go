@@ -71,6 +71,8 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 	case panel.DataMsg:
 		m.applyData(msg)
+
+		return m, nil
 	}
 
 	cmd := m.wm.Update(msg)

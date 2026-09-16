@@ -78,14 +78,37 @@ func New(styles config.Styles) *Model {
 	return &Model{styles: styles}
 }
 
-// Label returns the button's display label, e.g. "5Copy".
+// Label returns the button's display label, e.g. "5Copy", or "" when the
+// action is not a known button.
 func (a Action) Label() string {
-	return actions[int(a)-1].label
+	def, ok := actionDefFor(a)
+	if !ok {
+		return ""
+	}
+
+	return def.label
 }
 
-// Name returns the button's name without its function-key number, e.g. "Copy".
+// Name returns the button's name without its function-key number, e.g. "Copy",
+// or "" when the action is not a known button.
 func (a Action) Name() string {
-	return actions[int(a)-1].name
+	def, ok := actionDefFor(a)
+	if !ok {
+		return ""
+	}
+
+	return def.name
+}
+
+// actionDefFor returns the definition for an action and reports whether the
+// action is a known button.
+func actionDefFor(a Action) (actionDef, bool) {
+	idx := int(a) - 1
+	if idx < 0 || idx >= len(actions) {
+		return actionDef{}, false
+	}
+
+	return actions[idx], true
 }
 
 // Cmd returns a tea command that resolves to an ActivateMsg for the action.

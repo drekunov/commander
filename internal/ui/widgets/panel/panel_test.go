@@ -336,6 +336,43 @@ func TestDirectoryBelowParentStillDescends(t *testing.T) {
 	}
 }
 
+func TestAttributeMatchingIsCaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	data := []app.AttributeList{
+		{
+			{AttrName: "name", AttrValue: "name"},
+			{AttrName: "isdir", AttrValue: "isdir"},
+		},
+		{
+			{AttrName: "name", AttrValue: "sub"},
+			{AttrName: "isdir", AttrValue: true},
+		},
+	}
+
+	model := NewPanel(config.Styles{})
+	model.SetPanelID(app.PanelLeft)
+	model.SetData("/a", data)
+	model.Focus()
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
+	model = asModel(t, updated)
+
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("Enter on a lowercase-attribute directory produced no command")
+	}
+
+	msg, ok := cmd().(NavigateMsg)
+	if !ok {
+		t.Fatalf("cmd resolved to %T, want NavigateMsg", cmd())
+	}
+
+	if msg.Dir != "/a/sub" {
+		t.Errorf("NavigateMsg dir = %q, want /a/sub", msg.Dir)
+	}
+}
+
 func TestEmptyDirectoryShowsParentRow(t *testing.T) {
 	t.Parallel()
 

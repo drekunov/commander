@@ -31,10 +31,10 @@
 
 ## 6. Panel matching, complexity, and accessors (D8, D9, D10)
 
-- [ ] 6.1 Add a shared case-insensitive `attrValue(entry, name)` helper in `panel.go` and use it in `entryName`, `entryIsDir`, and `parentRow`.
-- [ ] 6.2 Extract listing→columns/rows construction into `columnsFor`/`displayRowsFor` helpers, keeping the `colTitles` fallback with a clarifying comment.
-- [ ] 6.3 Make `Action.Label()`/`Name()` return `""` for out-of-range values instead of panicking.
-- [ ] 6.4 Return early after `applyData` in `mainform.Update` so `DataMsg` is not broadcast to every window.
+- [x] 6.1 Add a shared case-insensitive `attrValue(entry, name)` helper in `panel.go` and use it in `entryName`, `entryIsDir`, and `parentRow`.
+- [x] 6.2 Extract listing→columns/rows construction into `columnsFor`/`displayRowsFor` helpers, keeping the `colTitles` fallback with a clarifying comment.
+- [x] 6.3 Make `Action.Label()`/`Name()` return `""` for out-of-range values instead of panicking.
+- [x] 6.4 Return early after `applyData` in `mainform.Update` so `DataMsg` is not broadcast to every window.
 
 ## 7. Regression tests
 

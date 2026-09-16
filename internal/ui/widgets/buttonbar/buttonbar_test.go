@@ -232,4 +232,12 @@ func TestLabelAndName(t *testing.T) {
 	if got := ActionCopy.Name(); got != "Copy" {
 		t.Errorf("ActionCopy.Name() = %q, want %q", got, "Copy")
 	}
+
+	if got := Action(0).Label(); got != "" {
+		t.Errorf("Action(0).Label() = %q, want empty", got)
+	}
+
+	if got := Action(99).Name(); got != "" {
+		t.Errorf("Action(99).Name() = %q, want empty", got)
+	}
 }

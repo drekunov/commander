@@ -153,15 +153,20 @@ func (m *Model) SetData(dir string, data []app.AttributeList) {
 
 	if len(data) == 0 {
 		m.rows = nil
-
-		m.setDisplayRows()
-		m.tableView.SetCursor(0)
-
-		return
+	} else {
+		cols := m.columnsFor(data[0])
+		m.tableView.SetColumns(cols)
+		m.contentWidth = contentWidthOf(cols)
+		m.rows = data[1:]
 	}
 
-	header := data[0]
+	m.tableView.SetRows(m.displayRowsFor(m.rows))
+	m.tableView.SetCursor(0)
+}
 
+// columnsFor builds the table columns from a header row and records their
+// titles so a synthetic parent row can be built for any connector schema.
+func (m *Model) columnsFor(header app.AttributeList) []table.Column {
 	m.colTitles = make([]string, 0, len(header))
 	cols := make([]table.Column, 0, len(header))
 
@@ -173,20 +178,18 @@ func (m *Model) SetData(dir string, data []app.AttributeList) {
 		})
 	}
 
-	m.tableView.SetColumns(cols)
+	return cols
+}
 
-	contentWidth := 0
+// contentWidthOf returns the natural rendered width of a set of columns,
+// including one cell of padding on each side of every cell.
+func contentWidthOf(cols []table.Column) int {
+	width := 0
 	for _, col := range cols {
-		contentWidth += col.Width
+		width += col.Width
 	}
 
-	// Each cell carries one column of padding on the left and right.
-	m.contentWidth = contentWidth + 2*len(cols)
-
-	m.rows = data[1:]
-
-	m.setDisplayRows()
-	m.tableView.SetCursor(0)
+	return width + 2*len(cols)
 }
 
 func (m *Model) SetVisible(visible bool) {
@@ -212,33 +215,41 @@ func navigationKeyMap() table.KeyMap {
 	return keyMap
 }
 
-func entryName(entry app.AttributeList) string {
+// attrValue returns the value of the named attribute using a case-insensitive,
+// whitespace-trimmed name match so every connector schema is read alike.
+func attrValue(entry app.AttributeList, name string) (any, bool) {
 	for _, attr := range entry {
-		if attr.AttrName == "Name" {
-			return fmt.Sprintf("%v", attr.AttrValue)
+		if strings.EqualFold(strings.TrimSpace(attr.AttrName), name) {
+			return attr.AttrValue, true
 		}
 	}
 
-	return ""
+	return nil, false
+}
+
+func entryName(entry app.AttributeList) string {
+	value, ok := attrValue(entry, "Name")
+	if !ok {
+		return ""
+	}
+
+	return fmt.Sprintf("%v", value)
 }
 
 func entryIsDir(entry app.AttributeList) bool {
-	for _, attr := range entry {
-		if attr.AttrName != "IsDir" {
-			continue
-		}
-
-		switch value := attr.AttrValue.(type) {
-		case bool:
-			return value
-		case string:
-			return value == parentIsDirValue
-		default:
-			return false
-		}
+	value, ok := attrValue(entry, "IsDir")
+	if !ok {
+		return false
 	}
 
-	return false
+	switch value := value.(type) {
+	case bool:
+		return value
+	case string:
+		return strings.EqualFold(strings.TrimSpace(value), parentIsDirValue)
+	default:
+		return false
+	}
 }
 
 func rowFromAttrList(attrList app.AttributeList) table.Row {
@@ -261,24 +272,24 @@ func (m *Model) showParent() bool {
 	return filepath.Dir(m.dir) != m.dir
 }
 
-// setDisplayRows renders the synthetic parent row (when applicable) followed
+// displayRowsFor renders the synthetic parent row (when applicable) followed
 // by one row per real entry.
-func (m *Model) setDisplayRows() {
+func (m *Model) displayRowsFor(entries []app.AttributeList) []table.Row {
 	if len(m.tableView.Columns()) == 0 {
 		m.setDefaultColumns()
 	}
 
-	rows := make([]table.Row, 0, len(m.rows)+1)
+	rows := make([]table.Row, 0, len(entries)+1)
 
 	if m.showParent() {
 		rows = append(rows, m.parentRow())
 	}
 
-	for _, entry := range m.rows {
+	for _, entry := range entries {
 		rows = append(rows, rowFromAttrList(entry))
 	}
 
-	m.tableView.SetRows(rows)
+	return rows
 }
 
 // setDefaultColumns installs columns for a listing delivered without a header
@@ -302,6 +313,18 @@ func (m *Model) setDefaultColumns() {
 	m.tableView.SetColumns(cols)
 }
 
+// titleIndex returns the index of the column whose title matches name
+// (case-insensitive, trimmed), or -1 when no column matches.
+func titleIndex(titles []string, name string) int {
+	for idx, title := range titles {
+		if strings.EqualFold(strings.TrimSpace(title), name) {
+			return idx
+		}
+	}
+
+	return -1
+}
+
 // parentRow builds the display row for the synthetic ".." entry from the
 // delivered column titles.
 func (m *Model) parentRow() table.Row {
@@ -312,17 +335,17 @@ func (m *Model) parentRow() table.Row {
 
 	row := make(table.Row, len(titles))
 
-	nameIdx := 0
+	nameIdx := titleIndex(titles, "name")
+	if nameIdx < 0 {
+		nameIdx = 0
+	}
 
-	for idx, title := range titles {
-		switch strings.ToLower(strings.TrimSpace(title)) {
-		case "name":
-			nameIdx = idx
-		case "isdir":
-			row[idx] = parentIsDirValue
-		case "path":
-			row[idx] = m.dir
-		}
+	if idx := titleIndex(titles, "isdir"); idx >= 0 {
+		row[idx] = parentIsDirValue
+	}
+
+	if idx := titleIndex(titles, "path"); idx >= 0 {
+		row[idx] = m.dir
 	}
 
 	row[nameIdx] = parentLabel
