@@ -14,7 +14,9 @@ LD_FLAGS := -ldflags "\
 lint:
 	gofumpt -w .
 	gci write . --skip-generated -s standard -s default
-	golangci-lint run
+	# golangci-lint 2.12.2's staticcheck cannot parse the Go 1.27 export data
+	# format; pin a toolchain it supports.
+	GOTOOLCHAIN=go1.26.4 golangci-lint run
 
 modup:
 	go get -u ./...

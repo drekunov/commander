@@ -7,7 +7,14 @@ import (
 	"github.com/drekunov/gc/internal/app"
 )
 
-const connectorName = "FileSystem"
+const (
+	connectorName = "FileSystem"
+
+	attrPath  = "path"
+	attrName  = "Name"
+	attrIsDir = "IsDir"
+	attrType  = "Type"
+)
 
 type FileSystem struct{}
 
@@ -38,28 +45,35 @@ func (f *FileSystem) ReadDir(path string) ([]app.AttributeList, error) {
 		return nil, nil
 	}
 
-	attributeList := make([]app.AttributeList, 0, len(entries))
+	attributeList := make([]app.AttributeList, 0, len(entries)+1)
+
+	attributeList = append(attributeList, app.AttributeList{
+		{AttrName: attrPath, AttrValue: attrPath},
+		{AttrName: attrName, AttrValue: attrName},
+		{AttrName: attrIsDir, AttrValue: attrIsDir},
+		{AttrName: attrType, AttrValue: attrType},
+	})
 
 	for _, entry := range entries {
 		attrs := make(app.AttributeList, 0, 4)
 
 		attrs = append(attrs, app.Attribute{
-			AttrName:  "path",
+			AttrName:  attrPath,
 			AttrValue: path,
 		})
 
 		attrs = append(attrs, app.Attribute{
-			AttrName:  "Name",
+			AttrName:  attrName,
 			AttrValue: entry.Name(),
 		})
 
 		attrs = append(attrs, app.Attribute{
-			AttrName:  "IsDir",
+			AttrName:  attrIsDir,
 			AttrValue: entry.IsDir(),
 		})
 
 		attrs = append(attrs, app.Attribute{
-			AttrName:  "Type",
+			AttrName:  attrType,
 			AttrValue: entry.Type(),
 		})
 

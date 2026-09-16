@@ -42,8 +42,10 @@
 }
 
 .table {
-    border-style: hidden;
-    padding: 0 1 0 1;
-    margin: 0 0 0 0;
+    background-color: #000080;
+}
+
+.button-bar {
+    color: #00AAAA;
     background-color: #000080;
 }

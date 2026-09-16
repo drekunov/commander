@@ -9,12 +9,15 @@ type Model struct {
 	text    string
 	pressed bool
 	focused bool
+
+	styles config.Styles
 }
 
-func New(text string, focused bool) *Model {
+func New(text string, focused bool, styles config.Styles) *Model {
 	return &Model{
 		text:    text,
 		focused: focused,
+		styles:  styles,
 	}
 }
 
@@ -35,15 +38,15 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	button := config.Values.ButtonStyle.
+	button := m.styles.ButtonStyle.
 		Render(m.text)
 
 	if m.focused {
-		button = config.Values.ActiveButtonStyle.Render(m.text)
+		button = m.styles.ActiveButtonStyle.Render(m.text)
 	}
 
 	if m.pressed {
-		button = config.Values.PressedButtonStyle.Render(m.text)
+		button = m.styles.PressedButtonStyle.Render(m.text)
 		m.pressed = false
 	}
 

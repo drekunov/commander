@@ -1,19 +1,23 @@
 package wm
 
 import (
-	"slices"
 	"sort"
-	"strings"
 	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/drekunov/gc/internal/config"
 )
 
 const (
-	minWindowWidth  = 10
-	minWindowHeight = 5
+	// FrameCols is the width taken by the left and right borders.
+	FrameCols = 2
+	// FrameRows is the height taken by the title bar and the bottom border.
+	FrameRows = 2
+
+	minWindowWidth   = 10
+	minWindowHeight  = 5
+	resizeGripInsetX = 2
+	resizeGripInsetY = 1
 )
 
 // Manager is a window manager that holds multiple windows with z-index,
@@ -23,11 +27,16 @@ type Manager struct {
 	windows       []*Window
 	nextID        int
 	width, height int
+	styles        config.Styles
+	renderer      renderer
 }
 
 // New creates an empty window manager.
-func New() *Manager {
-	return &Manager{}
+func New(styles config.Styles) *Manager {
+	return &Manager{
+		styles:   styles,
+		renderer: renderer{styles: styles},
+	}
 }
 
 // SetSize sets the available screen area for the manager.
@@ -242,7 +251,7 @@ func (m *Manager) View() string {
 	cvs := newCanvas(m.width, m.height)
 
 	for _, win := range visible {
-		rendered := m.renderWindow(win)
+		rendered := m.renderer.renderWindow(win)
 		cvs.stamp(win.X, win.Y, rendered)
 	}
 
@@ -308,217 +317,6 @@ func (m *Manager) cycleFocus() {
 	}
 
 	m.focus(sorted[0].ID)
-}
-
-// renderWindow draws a window frame with title bar and content.
-func (m *Manager) renderWindow(win *Window) string {
-	// Inner content area (subtract 2 for borders, 1 for title bar).
-	innerW := win.Width - 2
-	innerH := win.Height - 3
-
-	if innerW < 1 {
-		innerW = 1
-	}
-
-	if innerH < 1 {
-		innerH = 1
-	}
-
-	// Render the tea.Model content.
-	content := win.Content.View()
-
-	// Build title bar.
-	titleBar := m.buildTitleBar(win, innerW)
-
-	// Build resize grip.
-	grip := m.buildResizeGrip(innerW)
-
-	// Frame the content with a border — blue background fills the side borders.
-	bgColor := config.Values.DialogBoxStyle.GetBackground()
-	border := config.Values.DialogBoxStyle.GetBorderStyle()
-	borderStyle := lipgloss.NewStyle().
-		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground()).
-		Background(bgColor)
-	styledLeft := borderStyle.Render(border.Left)
-	styledRight := borderStyle.Render(border.Right)
-
-	framedContent := lipgloss.NewStyle().
-		Width(innerW).
-		Height(innerH).
-		Background(bgColor).
-		Render(content)
-
-	// Compose: title bar + content + grip, with side borders.
-	var out strings.Builder
-
-	out.WriteString(titleBar)
-	out.WriteByte('\n')
-
-	// Content lines with side borders.
-	padStyle := lipgloss.NewStyle().Background(bgColor)
-
-	for line := range strings.SplitSeq(framedContent, "\n") {
-		out.WriteString(styledLeft)
-
-		// Pad or clip line to innerW.
-		lineW := lipgloss.Width(line)
-		if lineW < innerW {
-			line += padStyle.Render(strings.Repeat(" ", innerW-lineW))
-		}
-
-		out.WriteString(line)
-		out.WriteString(styledRight)
-		out.WriteByte('\n')
-	}
-
-	// Bottom border with resize grip.
-	out.WriteString(grip)
-
-	return out.String()
-}
-
-func (m *Manager) buildTitleBar(win *Window, innerW int) string {
-	border := config.Values.DialogBoxStyle.GetBorderStyle()
-	bgColor := config.Values.DialogBoxStyle.GetBackground()
-	borderFg := config.Values.DialogBoxStyle.GetBorderBottomForeground()
-
-	// NC-style title: [ Title ]
-	title := "[ " + win.Title + " ]"
-
-	titleLen := lipgloss.Width(title)
-	if titleLen > innerW {
-		title = title[:innerW]
-		titleLen = innerW
-	}
-
-	padding := innerW - titleLen
-	left := padding / 2
-	right := padding - left
-
-	borderStyle := lipgloss.NewStyle().Foreground(borderFg).Background(bgColor)
-
-	var titleStyle lipgloss.Style
-	if win.Focused {
-		// Focused: bright white title, bold — matches NC active dialog style.
-		titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(bgColor).
-			Bold(true)
-	} else {
-		// Unfocused: same cyan as the border, no bold.
-		titleStyle = lipgloss.NewStyle().
-			Foreground(borderFg).
-			Background(bgColor)
-	}
-
-	leftPart := border.TopLeft + strings.Repeat(border.Top, left)
-	rightPart := strings.Repeat(border.Top, right) + border.TopRight
-
-	return borderStyle.Render(leftPart) + titleStyle.Render(title) + borderStyle.Render(rightPart)
-}
-
-func (m *Manager) buildResizeGrip(innerW int) string {
-	border := config.Values.DialogBoxStyle.GetBorderStyle()
-	bgColor := config.Values.DialogBoxStyle.GetBackground()
-
-	gripRune := "◢"
-	bottomLen := max(innerW-1, 0)
-
-	grip := border.BottomLeft +
-		strings.Repeat(border.Bottom, bottomLen) +
-		gripRune +
-		border.BottomRight
-
-	return lipgloss.NewStyle().
-		Foreground(config.Values.DialogBoxStyle.GetBorderBottomForeground()).
-		Background(bgColor).
-		Render(grip)
-}
-
-func (m *Manager) handleMouse(msg tea.MouseMsg) tea.Cmd {
-	mouseX, mouseY := msg.X, msg.Y
-
-	switch msg.Action {
-	case tea.MouseActionPress:
-		if msg.Button != tea.MouseButtonLeft {
-			return nil
-		}
-
-		return m.handleMousePress(mouseX, mouseY, msg)
-
-	case tea.MouseActionMotion:
-		for _, win := range m.windows {
-			if win.dragging {
-				win.X = mouseX - win.dragOffX
-				win.Y = mouseY - win.dragOffY
-
-				return nil
-			}
-
-			if win.resizing {
-				deltaW := mouseX - win.resizeOrigX
-				deltaH := mouseY - win.resizeOrigY
-				m.resize(win.ID, win.resizeOrigW+deltaW, win.resizeOrigH+deltaH)
-
-				return nil
-			}
-		}
-
-	case tea.MouseActionRelease:
-		for _, win := range m.windows {
-			win.dragging = false
-			win.resizing = false
-		}
-	}
-
-	return nil
-}
-
-func (m *Manager) handleMousePress(mouseX, mouseY int, msg tea.MouseMsg) tea.Cmd {
-	sorted := m.sortedWindows()
-
-	for i := range slices.Backward(sorted) {
-		win := sorted[i]
-		if !win.Visible || !win.Contains(mouseX, mouseY) {
-			continue
-		}
-
-		m.focus(win.ID)
-
-		if win.InTitleBar(mouseX, mouseY) {
-			win.dragging = true
-			win.dragOffX = mouseX - win.X
-			win.dragOffY = mouseY - win.Y
-
-			return nil
-		}
-
-		if win.InResizeGrip(mouseX, mouseY) {
-			win.resizing = true
-			win.resizeOrigW = win.Width
-			win.resizeOrigH = win.Height
-			win.resizeOrigX = mouseX
-			win.resizeOrigY = mouseY
-
-			return nil
-		}
-
-		// Click inside content area — translate coordinates and forward.
-		localMsg := tea.MouseMsg{
-			X:      mouseX - win.X - 1,
-			Y:      mouseY - win.Y - 1,
-			Action: msg.Action,
-			Button: msg.Button,
-		}
-
-		var cmd tea.Cmd
-
-		win.Content, cmd = win.Content.Update(localMsg)
-
-		return cmd
-	}
-
-	return nil
 }
 
 func (m *Manager) handleKey(msg tea.KeyMsg) tea.Cmd {
