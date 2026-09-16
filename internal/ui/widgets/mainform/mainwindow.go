@@ -274,15 +274,15 @@ func (m *Model) syncPanelFocus() {
 			continue
 		}
 
-		p, ok := win.Content.(*panel.Model)
+		panelModel, ok := win.Content.(*panel.Model)
 		if !ok {
 			continue
 		}
 
 		if win.Focused {
-			p.Focus()
+			panelModel.Focus()
 		} else {
-			p.Blur()
+			panelModel.Blur()
 		}
 	}
 }

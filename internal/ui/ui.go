@@ -128,6 +128,7 @@ func (m *Model) showMock(action buttonbar.Action) {
 	text := action.Name() + " is not implemented yet"
 
 	m.mockMu.Lock()
+
 	if m.mockDialog != nil {
 		m.mockDialog.SetText(text)
 		m.mockMu.Unlock()
@@ -160,6 +161,7 @@ func (m *Model) waitMock(info *dialogs.Info) {
 	}
 
 	m.mockMu.Lock()
+
 	if m.mockDialog != info {
 		m.mockMu.Unlock()
 

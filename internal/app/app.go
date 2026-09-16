@@ -46,22 +46,6 @@ func (a *App) Navigate(panel PanelID, dir string) {
 	}
 }
 
-// takePending returns and clears the latest request, reporting whether one was
-// waiting.
-func (a *App) takePending() (NavRequest, bool) {
-	a.navMu.Lock()
-	defer a.navMu.Unlock()
-
-	if a.pending == nil {
-		return NavRequest{}, false
-	}
-
-	nav := *a.pending
-	a.pending = nil
-
-	return nav, true
-}
-
 func (a *App) Run(ctx context.Context) error {
 	log.Println(getBuildInfo())
 
@@ -80,6 +64,22 @@ func (a *App) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// takePending returns and clears the latest request, reporting whether one was
+// waiting.
+func (a *App) takePending() (NavRequest, bool) {
+	a.navMu.Lock()
+	defer a.navMu.Unlock()
+
+	if a.pending == nil {
+		return NavRequest{}, false
+	}
+
+	nav := *a.pending
+	a.pending = nil
+
+	return nav, true
 }
 
 // loadPanel reads dir and delivers it to the panel. A read failure is shown

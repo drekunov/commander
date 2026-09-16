@@ -135,6 +135,38 @@ func (m *Model) View() string {
 	return m.styles.TableStyle.Render(m.tableView.View())
 }
 
+// SetData rebuilds the table for dir from a listing whose first row is the
+// column header and whose remaining rows are one directory entry each. When
+// the directory has a parent, a synthetic ".." row leads the listing; the
+// cursor is reset to the first row after a reload.
+func (m *Model) SetData(dir string, data []app.AttributeList) {
+	m.dir = dir
+
+	if len(data) == 0 {
+		m.rows = nil
+	} else {
+		cols := m.columnsFor(data[0])
+		m.tableView.SetColumns(cols)
+		m.contentWidth = contentWidthOf(cols)
+		m.rows = data[1:]
+	}
+
+	m.tableView.SetRows(m.displayRowsFor(m.rows))
+	m.tableView.SetCursor(0)
+}
+
+func (m *Model) SetVisible(visible bool) {
+	m.visible = visible
+}
+
+func (m *Model) SetWidth(width int) {
+	m.width = width
+}
+
+func (m *Model) SetHeight(height int) {
+	m.height = height
+}
+
 // tableStyles returns the table styles for the current focus state. The
 // bubbles table highlights the cursor row regardless of focus, so a blurred
 // panel renders that row unstyled to hide its cursor. A focused panel spans the
@@ -155,26 +187,6 @@ func (m *Model) tableStyles() table.Styles {
 	}
 
 	return styles
-}
-
-// SetData rebuilds the table for dir from a listing whose first row is the
-// column header and whose remaining rows are one directory entry each. When
-// the directory has a parent, a synthetic ".." row leads the listing; the
-// cursor is reset to the first row after a reload.
-func (m *Model) SetData(dir string, data []app.AttributeList) {
-	m.dir = dir
-
-	if len(data) == 0 {
-		m.rows = nil
-	} else {
-		cols := m.columnsFor(data[0])
-		m.tableView.SetColumns(cols)
-		m.contentWidth = contentWidthOf(cols)
-		m.rows = data[1:]
-	}
-
-	m.tableView.SetRows(m.displayRowsFor(m.rows))
-	m.tableView.SetCursor(0)
 }
 
 // columnsFor builds the table columns from a header row and records their
@@ -203,18 +215,6 @@ func contentWidthOf(cols []table.Column) int {
 	}
 
 	return width + 2*len(cols)
-}
-
-func (m *Model) SetVisible(visible bool) {
-	m.visible = visible
-}
-
-func (m *Model) SetWidth(width int) {
-	m.width = width
-}
-
-func (m *Model) SetHeight(height int) {
-	m.height = height
 }
 
 // navigationKeyMap extends the default table keymap so Left jumps the cursor
