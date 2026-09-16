@@ -12,10 +12,10 @@
 
 ## 3. Bar background, styling, and pressed flash (D3, D4, D7)
 
-- [ ] 3.1 Derive the per-segment background from `ButtonBarStyle` so the full-width strip is themed.
-- [ ] 3.2 Replace the hand-rolled `colorize` in `buttonbar.go` with lipgloss `Style.Copy()`/`Inherit` composition.
-- [ ] 3.3 Move the `pressed = 0` reset from `buttonbar.View()` to the start of `buttonbar.Update`.
-- [ ] 3.4 Update `buttonbar_test.go` for the new reset timing and themed background expectations.
+- [x] 3.1 Derive the per-segment background from `ButtonBarStyle` so the full-width strip is themed.
+- [x] 3.2 Replace the hand-rolled `colorize` in `buttonbar.go` with lipgloss `Style.Copy()`/`Inherit` composition.
+- [x] 3.3 Move the `pressed = 0` reset from `buttonbar.View()` to the start of `buttonbar.Update`.
+- [x] 3.4 Update `buttonbar_test.go` for the new reset timing and themed background expectations.
 
 ## 4. Mock dialog coalescing (D5)
 

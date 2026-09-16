@@ -42,7 +42,7 @@ Remove `right.Focus()` from `mainform.New`. Add `mainform.syncPanelFocus()` that
 
 ### D3. Paint the bar background without restructuring the renderer
 
-Render the strip's background from `ButtonBarStyle` while keeping per-button foreground/bold from `Button/Active/Pressed` styles. The segment loop already guarantees exact total width, so the background is painted uniformly across the full row by making the segment background come from `ButtonBarStyle`.
+Render the strip's background from `ButtonBarStyle` while keeping per-button foreground/bold from `Button/Active/Pressed` styles. The segment loop already guarantees exact total width, so the background is painted uniformly across the full row by making the segment background come from `ButtonBarStyle`. Normal buttons keep the strip's own foreground (cyan) rather than `.button`'s black, which would be unreadable on the strip; only the pressed/active foregrounds are overlaid.
 
 - *Alternative considered*: build a full-width `ButtonBarStyle` base string and overlay button labels via `lipgloss.Place`. Rejected: ANSI overlay is fiddly; the existing single-pass segment loop already handles width, so overriding the segment background is simpler and preserves current behavior.
 

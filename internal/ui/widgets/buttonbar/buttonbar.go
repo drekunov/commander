@@ -114,6 +114,9 @@ func (m *Model) Init() tea.Cmd {
 
 // Update implements tea.Model.
 func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
+	// Clear the one-frame pressed flash left by the previous activation.
+	m.pressed = 0
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -144,12 +147,9 @@ func (m *Model) View() string {
 
 		text += strings.Repeat(" ", segWidth-len(text))
 
-		style := colorize(m.styleFor(idx, def.action))
+		style := m.styleFor(idx, def.action)
 		row.WriteString(style.Render(text))
 	}
-
-	// The pressed style applies for the single frame that follows activation.
-	m.pressed = 0
 
 	return row.String()
 }
@@ -209,18 +209,31 @@ func (m *Model) activate(action Action) tea.Cmd {
 	return action.Cmd()
 }
 
-// styleFor picks the button style for a segment: the pressed style for the
-// button activated this frame, the active style for the focused button while
-// the bar is focused, and the plain button style otherwise.
+// styleFor picks the segment style: the pressed or active button's foreground
+// and text decoration drawn on the bar strip's background, and the strip style
+// itself for the remaining buttons. Using the strip as the base keeps the
+// full-width background themed and the labels readable on it.
 func (m *Model) styleFor(idx int, action Action) lipgloss.Style {
 	switch {
 	case action == m.pressed:
-		return m.styles.PressedButtonStyle
+		return overlay(m.styles.ButtonBarStyle, m.styles.PressedButtonStyle)
 	case m.focused && idx == m.focusedIdx:
-		return m.styles.ActiveButtonStyle
+		return overlay(m.styles.ButtonBarStyle, m.styles.ActiveButtonStyle)
 	default:
-		return m.styles.ButtonStyle
+		return m.styles.ButtonBarStyle
 	}
+}
+
+// overlay draws button's foreground and text decoration on top of bar's
+// background, so labels sit on the themed strip instead of on their own fill.
+func overlay(bar, button lipgloss.Style) lipgloss.Style {
+	style := bar.Inherit(button)
+
+	if fg := button.GetForeground(); fg != nil {
+		style = style.Foreground(fg)
+	}
+
+	return style
 }
 
 // segmentWidth returns the width in cells of the idx-th button segment.
@@ -248,22 +261,4 @@ func (m *Model) actionIndexAtColumn(col int) int {
 	}
 
 	return buttonCount - 1
-}
-
-// colorize returns a minimal style carrying the colors of the given style, so
-// segments can be painted cell-for-cell at an exact width.
-func colorize(style lipgloss.Style) lipgloss.Style {
-	colored := lipgloss.NewStyle().
-		Foreground(style.GetForeground()).
-		Background(style.GetBackground())
-
-	if style.GetBold() {
-		colored = colored.Bold(true)
-	}
-
-	if style.GetUnderline() {
-		colored = colored.Underline(true)
-	}
-
-	return colored
 }

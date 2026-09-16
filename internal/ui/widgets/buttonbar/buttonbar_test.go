@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/drekunov/gc/internal/config"
 )
@@ -97,8 +98,41 @@ func TestFunctionKeyActivation(t *testing.T) {
 
 	updated.View()
 
+	if updated.pressed != ActionCopy {
+		t.Error("pressed should persist until the next Update, not be cleared by View")
+	}
+
+	updated, _ = updated.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+
 	if updated.pressed != 0 {
-		t.Error("pressed was not cleared after rendering the flash frame")
+		t.Error("pressed was not cleared at the start of the next Update")
+	}
+}
+
+func TestPressedSegmentKeepsBarBackground(t *testing.T) {
+	t.Parallel()
+
+	bar := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00AAAA")).
+		Background(lipgloss.Color("#000080"))
+	pressed := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FFFF00")).
+		Background(lipgloss.Color("#00AAAA"))
+
+	model := New(config.Styles{
+		ButtonBarStyle:     bar,
+		PressedButtonStyle: pressed,
+	})
+	model.pressed = ActionCopy
+
+	got := model.styleFor(0, ActionCopy)
+
+	if got.GetBackground() != bar.GetBackground() {
+		t.Errorf("pressed segment background = %v, want bar background %v", got.GetBackground(), bar.GetBackground())
+	}
+
+	if got.GetForeground() != pressed.GetForeground() {
+		t.Errorf("pressed segment foreground = %v, want pressed foreground %v", got.GetForeground(), pressed.GetForeground())
 	}
 }
 
