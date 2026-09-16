@@ -130,18 +130,31 @@ func (m *Model) View() string {
 
 	m.tableView.SetWidth(m.width)
 	m.tableView.SetHeight(m.height)
+	m.tableView.SetStyles(m.tableStyles())
 
-	// Span the cursor bar across the full panel width so the table viewport's
-	// horizontal padding stays gray instead of leaking as unstyled cells after
-	// the selected row's style reset.
+	return m.styles.TableStyle.Render(m.tableView.View())
+}
+
+// tableStyles returns the table styles for the current focus state. The
+// bubbles table highlights the cursor row regardless of focus, so a blurred
+// panel renders that row unstyled to hide its cursor. A focused panel spans the
+// cursor bar across the full panel width so the viewport's horizontal padding
+// stays gray instead of leaking as unstyled cells after the selected row's
+// style reset.
+func (m *Model) tableStyles() table.Styles {
 	styles := ncTableStyles()
+
+	if !m.tableView.Focused() {
+		styles.Selected = lipgloss.NewStyle()
+
+		return styles
+	}
+
 	if padRight := m.width - m.contentWidth; padRight > 0 {
 		styles.Selected = styles.Selected.PaddingRight(padRight)
 	}
 
-	m.tableView.SetStyles(styles)
-
-	return m.styles.TableStyle.Render(m.tableView.View())
+	return styles
 }
 
 // SetData rebuilds the table for dir from a listing whose first row is the

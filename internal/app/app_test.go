@@ -289,3 +289,45 @@ func TestNavigateErrorShowsDialogAndKeepsListing(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 	}
 }
+
+func TestNavigateErrorThenCancelReturns(t *testing.T) {
+	t.Parallel()
+
+	uiFake := newFakeUI()
+	connFake := newFakeConnector()
+	connFake.dirs["/"] = rows("etc")
+	connFake.errs["/secret"] = errBoom
+
+	appInstance := app.New(uiFake, connFake)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- appInstance.Run(ctx)
+	}()
+
+	waitForData(t, uiFake) // left
+	waitForData(t, uiFake) // right
+
+	appInstance.Navigate(app.PanelRight, "/secret")
+
+	select {
+	case <-uiFake.errCh:
+	case <-time.After(2 * time.Second):
+		cancel()
+		t.Fatal("error dialog was not shown for an unreadable directory")
+	}
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Errorf("Run returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return after cancellation")
+	}
+}

@@ -38,10 +38,10 @@
 
 ## 7. Regression tests
 
-- [ ] 7.1 Add a test that starts `App.Run`, triggers a failed `Navigate`, then cancels the app context and asserts `Run` returns (no deadlock) within a timeout.
-- [ ] 7.2 Add a `panel` test asserting only the focused panel renders a cursor after focus changes.
-- [ ] 7.3 Add a `buttonbar` test asserting the full-width background is rendered and repeated activation reuses one mock dialog.
-- [ ] 7.4 Rename the `asModel` test helper and remove the hardcoded `Y:29` coupling in `mainwindow_test.go`.
+- [x] 7.1 Add a test that starts `App.Run`, triggers a failed `Navigate`, then cancels the app context and asserts `Run` returns (no deadlock) within a timeout.
+- [x] 7.2 Add a `panel` test asserting only the focused panel renders a cursor after focus changes.
+- [x] 7.3 Add a `buttonbar` test asserting the full-width background is rendered and repeated activation reuses one mock dialog.
+- [x] 7.4 Rename the `asModel` test helper and remove the hardcoded `Y:29` coupling in `mainwindow_test.go`.
 
 ## 8. Verification
 

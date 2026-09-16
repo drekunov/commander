@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/drekunov/gc/internal/config"
+	"github.com/drekunov/gc/internal/ui/widgets/buttonbar"
 	"github.com/drekunov/gc/internal/ui/widgets/mainform"
 )
 
@@ -86,5 +87,64 @@ func TestInputReturnsOnCancelledContext(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Input did not return after context cancellation")
+	}
+}
+
+func TestErrorReturnsOnQuit(t *testing.T) {
+	t.Parallel()
+
+	model := newTestModel()
+	model.quit = make(chan struct{})
+
+	done := make(chan struct{})
+
+	go func() {
+		model.Error("title", "message")
+		close(done)
+	}()
+
+	close(model.quit)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Error did not return after quit (dialog deadlock)")
+	}
+}
+
+func TestRepeatedMockActivationReusesDialog(t *testing.T) {
+	t.Parallel()
+
+	model := &Model{
+		main:    mainform.New(config.Styles{}),
+		styles:  config.Styles{},
+		sendMsg: func(tea.Msg) {},
+		quit:    make(chan struct{}),
+	}
+
+	defer model.stop()
+
+	model.showMock(buttonbar.ActionCopy)
+
+	model.mockMu.Lock()
+	first := model.mockDialog
+	model.mockMu.Unlock()
+
+	model.showMock(buttonbar.ActionEdit)
+
+	model.mockMu.Lock()
+	second := model.mockDialog
+	model.mockMu.Unlock()
+
+	if first == nil || second == nil {
+		t.Fatal("mock dialog was not created")
+	}
+
+	if first != second {
+		t.Error("repeated activation opened a second mock dialog instead of reusing one")
+	}
+
+	if got := len(model.main.WM().Windows()); got != 3 {
+		t.Errorf("window count = %d, want 3 (two panels and one mock dialog)", got)
 	}
 }

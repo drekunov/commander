@@ -48,7 +48,7 @@ func TestBarRowPressIsConsumed(t *testing.T) {
 		Action: tea.MouseActionPress,
 		Button: tea.MouseButtonLeft,
 		X:      44,
-		Y:      29,
+		Y:      model.Height() - 1,
 	})
 
 	if cmd == nil {

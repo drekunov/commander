@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/drekunov/gc/internal/app"
 	"github.com/drekunov/gc/internal/config"
 )
 
 // testListing builds a listing whose entries are files unless their name
 // carries the "d:" marker, in which case they are directories.
-func asModel(t *testing.T, model tea.Model) *Model {
+func mustPanelModel(t *testing.T, model tea.Model) *Model {
 	t.Helper()
 
 	typed, ok := model.(*Model)
@@ -142,7 +143,7 @@ func TestEnterOnFileEmitsNothing(t *testing.T) {
 
 	model.Focus()
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
-	model = asModel(t, updated)
+	model = mustPanelModel(t, updated)
 
 	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd != nil {
@@ -192,7 +193,7 @@ func TestReloadResetsCursorToTop(t *testing.T) {
 	model.Focus()
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
-	model = asModel(t, updated)
+	model = mustPanelModel(t, updated)
 
 	if model.tableView.Cursor() != 1 {
 		t.Fatalf("cursor = %d, want 1 after one Right", model.tableView.Cursor())
@@ -213,7 +214,7 @@ func TestRightMovesDownAndClamps(t *testing.T) {
 	model.Focus()
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
-	model = asModel(t, updated)
+	model = mustPanelModel(t, updated)
 
 	if model.tableView.Cursor() != 1 {
 		t.Errorf("cursor after Right = %d, want 1", model.tableView.Cursor())
@@ -221,7 +222,7 @@ func TestRightMovesDownAndClamps(t *testing.T) {
 
 	for range 2 {
 		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRight})
-		model = asModel(t, updated)
+		model = mustPanelModel(t, updated)
 	}
 
 	if model.tableView.Cursor() != 2 {
@@ -238,7 +239,7 @@ func TestLeftJumpsToTop(t *testing.T) {
 
 	for range 2 {
 		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
-		model = asModel(t, updated)
+		model = mustPanelModel(t, updated)
 	}
 
 	if model.tableView.Cursor() != 2 {
@@ -246,7 +247,7 @@ func TestLeftJumpsToTop(t *testing.T) {
 	}
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyLeft})
-	model = asModel(t, updated)
+	model = mustPanelModel(t, updated)
 
 	if model.tableView.Cursor() != 0 {
 		t.Errorf("cursor after Left = %d, want 0", model.tableView.Cursor())
@@ -319,7 +320,7 @@ func TestDirectoryBelowParentStillDescends(t *testing.T) {
 	model.Focus()
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
-	model = asModel(t, updated)
+	model = mustPanelModel(t, updated)
 
 	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
@@ -356,7 +357,7 @@ func TestAttributeMatchingIsCaseInsensitive(t *testing.T) {
 	model.Focus()
 
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
-	model = asModel(t, updated)
+	model = mustPanelModel(t, updated)
 
 	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
@@ -390,5 +391,28 @@ func TestEmptyDirectoryShowsParentRow(t *testing.T) {
 
 	if model.tableView.Cursor() != 0 {
 		t.Errorf("cursor = %d, want 0 on the parent row", model.tableView.Cursor())
+	}
+}
+
+func TestBlurHidesCursor(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetData("/", testListing("fa", "fb"))
+	model.SetWidth(40)
+	model.SetHeight(10)
+
+	model.Focus()
+	focused := model.tableStyles().Selected.GetBackground()
+
+	model.Blur()
+	blurred := model.tableStyles().Selected.GetBackground()
+
+	if focused == blurred {
+		t.Error("blurring the panel did not change the cursor highlight")
+	}
+
+	if blurred != lipgloss.NewStyle().GetBackground() {
+		t.Error("blurred panel still renders a cursor highlight")
 	}
 }

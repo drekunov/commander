@@ -36,7 +36,7 @@ Add `case <-m.quit:` as an additional branch in every blocking `select` in `dial
 
 ### D2. Mirror WM focus to panel cursor via an explicit sync
 
-Remove `right.Focus()` from `mainform.New`. Add `mainform.syncPanelFocus()` that sets `panel.Focus()` for the focused panel window and `panel.Blur()` for the other. Call it after construction and after `m.wm.Update(msg)` (which can change focus via mouse clicks and Tab). `panel.Focus/Blur` are idempotent and cheap, so per-Update sync is acceptable.
+Remove `right.Focus()` from `mainform.New`. Add `mainform.syncPanelFocus()` that sets `panel.Focus()` for the focused panel window and `panel.Blur()` for the other. Call it after construction and after `m.wm.Update(msg)` (which can change focus via mouse clicks and Tab). `panel.Focus/Blur` are idempotent and cheap, so per-Update sync is acceptable. The bubbles table highlights the cursor row regardless of its focus flag, so `panel.View` also suppresses the highlight (through a `tableStyles` helper) when the table is blurred; otherwise focusing alone would not hide the cursor.
 
 - *Alternative considered*: push focus into the WM (`Content` implementing a focus interface). Rejected: `tea.Model` has no focus contract; keeps the change localized to mainform.
 
