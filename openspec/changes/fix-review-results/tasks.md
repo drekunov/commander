@@ -6,9 +6,9 @@
 
 ## 2. Focus wiring (D2)
 
-- [ ] 2.1 Remove the unconditional `right.Focus()` from `mainform.New`.
-- [ ] 2.2 Add `mainform.syncPanelFocus()` that mirrors each panel window's `Focused` flag to `panel.Focus()`/`panel.Blur()`.
-- [ ] 2.3 Call `syncPanelFocus()` after construction and after `m.wm.Update(msg)` in `mainform.Update`.
+- [x] 2.1 Remove the unconditional `right.Focus()` from `mainform.New`.
+- [x] 2.2 Add `mainform.syncPanelFocus()` that mirrors each panel window's `Focused` flag to `panel.Focus()`/`panel.Blur()`.
+- [x] 2.3 Call `syncPanelFocus()` after construction and after `m.wm.Update(msg)` in `mainform.Update`.
 
 ## 3. Bar background, styling, and pressed flash (D3, D4, D7)
 

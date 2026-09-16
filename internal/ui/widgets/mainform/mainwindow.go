@@ -25,11 +25,9 @@ func New(styles config.Styles) *Model {
 
 	left := panel.NewPanel(styles)
 	left.SetPanelID(app.PanelLeft)
-	left.Focus()
 
 	right := panel.NewPanel(styles)
 	right.SetPanelID(app.PanelRight)
-	right.Focus()
 
 	leftID := mgr.Add(left, "", 0, 0, 40, 20)
 	rightID := mgr.Add(right, "", 40, 0, 40, 20)
@@ -37,12 +35,15 @@ func New(styles config.Styles) *Model {
 	// Restore focus to the left panel (Add focuses the last added window).
 	mgr.Focus(leftID)
 
-	return &Model{
+	model := &Model{
 		wm:           mgr,
 		leftPanelID:  leftID,
 		rightPanelID: rightID,
 		bar:          buttonbar.New(styles),
 	}
+	model.syncPanelFocus()
+
+	return model
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -73,6 +74,7 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	}
 
 	cmd := m.wm.Update(msg)
+	m.syncPanelFocus()
 
 	return m, cmd
 }
@@ -145,6 +147,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 		case tea.KeyTab:
 			m.bar.SetFocused(false)
 			m.wm.CycleFocus()
+			m.syncPanelFocus()
 
 			return nil, true
 		}
@@ -258,4 +261,26 @@ func (m *Model) panelFromWindow(winID int) *panel.Model {
 	p, _ := win.Content.(*panel.Model)
 
 	return p
+}
+
+// syncPanelFocus mirrors each panel window's focus state onto its table
+// cursor so only the focused panel renders a selection cursor.
+func (m *Model) syncPanelFocus() {
+	for _, id := range []int{m.leftPanelID, m.rightPanelID} {
+		win := m.wm.Get(id)
+		if win == nil {
+			continue
+		}
+
+		p, ok := win.Content.(*panel.Model)
+		if !ok {
+			continue
+		}
+
+		if win.Focused {
+			p.Focus()
+		} else {
+			p.Blur()
+		}
+	}
 }
