@@ -122,6 +122,49 @@ func TestPressAboveBarReachesWmAndClearsBarFocus(t *testing.T) {
 	}
 }
 
+// dummyDialog is a do-nothing window content used to stand in for a dialog.
+type dummyDialog struct{}
+
+func (dummyDialog) Init() tea.Cmd                       { return nil }
+func (dummyDialog) Update(tea.Msg) (tea.Model, tea.Cmd) { return dummyDialog{}, nil }
+func (dummyDialog) View() string                        { return "" }
+
+func TestDialogIsModal(t *testing.T) {
+	t.Parallel()
+
+	model := mainform.New(config.Styles{})
+	model = resizeMainform(model)
+
+	dialogID := model.WM().Add(dummyDialog{}, "Dialog", 10, 5, 20, 5)
+
+	// F2 must not reach the button bar while the dialog is open.
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyF2})
+	if cmd != nil {
+		t.Errorf("F2 produced a command %v, want none", cmd())
+	}
+
+	if got := model.WM().FocusedWindowID(); got != dialogID {
+		t.Errorf("focused window = %d, want the dialog %d", got, dialogID)
+	}
+
+	// A click outside the dialog must not change focus.
+	model.Update(tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonLeft, X: 80, Y: 2})
+
+	if got := model.WM().FocusedWindowID(); got != dialogID {
+		t.Errorf("click outside changed focus to %d, want the dialog %d", got, dialogID)
+	}
+
+	// F10 still quits.
+	_, cmd = model.Update(tea.KeyMsg{Type: tea.KeyF10})
+	if cmd == nil {
+		t.Fatal("F10 produced no command")
+	}
+
+	if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Errorf("F10 resolved to %T, want tea.QuitMsg", cmd())
+	}
+}
+
 func listingFor(names ...string) []app.AttributeList {
 	data := make([]app.AttributeList, 0, 1+len(names))
 	data = append(data, app.AttributeList{

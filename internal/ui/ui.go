@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -13,7 +14,13 @@ import (
 	"github.com/drekunov/gc/internal/ui/widgets/panel"
 )
 
-const dumpScreenKey = tea.KeyF12
+const (
+	dumpScreenKey = tea.KeyF12
+
+	// sortWindowCaption is the sort window's caption; the instruction lives in
+	// the caption rather than as a body line.
+	sortWindowCaption = "Sort by"
+)
 
 type Model struct {
 	program *tea.Program
@@ -81,6 +88,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case buttonbar.ActivateMsg:
 		return m, m.handleBarActivation(msg.Action)
 
+	case sortColumnMsg:
+		if msg.column != "" {
+			if p := m.main.FocusedPanel(); p != nil {
+				p.SortBy(msg.column)
+			}
+		}
+
+		return m, nil
+
 	case panel.NavigateMsg:
 		m.handleNavigate(msg)
 
@@ -108,17 +124,46 @@ func (m *Model) dumpCmd(frame string) tea.Cmd {
 	}
 }
 
-// handleBarActivation resolves a function-button activation. Quit is the one
-// real action; every other button reports a mock placeholder through the Info
+// handleBarActivation resolves a function-button activation. Quit and Menu are
+// real actions; every other button reports a mock placeholder through the Info
 // dialog. This switch is the seam where real actions later replace the mocks.
 func (m *Model) handleBarActivation(action buttonbar.Action) tea.Cmd {
-	if action == buttonbar.ActionQuit {
+	switch action {
+	case buttonbar.ActionQuit:
 		return tea.Quit
+
+	case buttonbar.ActionMenu:
+		return m.sortWindowCmd()
 	}
 
 	m.showMock(action)
 
 	return nil
+}
+
+// sortColumnMsg carries the column chosen in the sort window back to the event
+// loop, where the focused panel is mutated.
+type sortColumnMsg struct {
+	column string
+}
+
+// sortWindowCmd opens the modal column list for the focused panel and resolves
+// to the chosen column. The dialog blocks, so it runs as a command off the
+// event loop; an empty column means the window was canceled.
+func (m *Model) sortWindowCmd() tea.Cmd {
+	focused := m.main.FocusedPanel()
+	if focused == nil {
+		return nil
+	}
+
+	titles := focused.ColumnTitles()
+	if len(titles) == 0 {
+		return nil
+	}
+
+	return func() tea.Msg {
+		return sortColumnMsg{column: m.Select(context.Background(), sortWindowCaption, "", titles)}
+	}
 }
 
 // showMock reports a not-yet-implemented bar action. Only one mock dialog is
@@ -140,7 +185,6 @@ func (m *Model) showMock(action buttonbar.Action) {
 
 	info := dialogs.NewInfo(m.styles)
 	info.SetText(text)
-	info.SetTitle("Mock")
 	info.SetVisible(true)
 
 	m.mockDialog = info

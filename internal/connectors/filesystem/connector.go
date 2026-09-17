@@ -12,8 +12,20 @@ const (
 	connectorName = "FileSystem"
 
 	attrName  = "Name"
+	attrSize  = "Size"
+	attrDate  = "Date"
+	attrTime  = "Time"
 	attrIsDir = "IsDir"
-	attrType  = "Type"
+
+	dirSizeValue = "<DIR>"
+
+	dateLayout = "2006-01-02"
+	timeLayout = "15:04:05"
+
+	columnWidthName = 11
+	columnWidthSize = 6
+	columnWidthDate = 10
+	columnWidthTime = 8
 )
 
 type FileSystem struct{}
@@ -48,33 +60,52 @@ func (f *FileSystem) ReadDir(path string) ([]app.AttributeList, error) {
 	attributeList := make([]app.AttributeList, 0, len(entries)+1)
 
 	attributeList = append(attributeList, app.AttributeList{
-		{AttrName: attrName, AttrValue: attrName},
-		{AttrName: attrIsDir, AttrValue: attrIsDir},
-		{AttrName: attrType, AttrValue: attrType},
+		{AttrName: attrName, AttrValue: attrName, Width: columnWidthName, Flex: true},
+		{AttrName: attrSize, AttrValue: attrSize, Width: columnWidthSize},
+		{AttrName: attrDate, AttrValue: attrDate, Width: columnWidthDate},
+		{AttrName: attrTime, AttrValue: attrTime, Width: columnWidthTime},
+		{AttrName: attrIsDir, AttrValue: attrIsDir, Hidden: true},
 	})
 
 	for _, entry := range entries {
-		attrs := make(app.AttributeList, 0, 3)
-
-		attrs = append(attrs, app.Attribute{
-			AttrName:  attrName,
-			AttrValue: entry.Name(),
-		})
-
-		attrs = append(attrs, app.Attribute{
-			AttrName:  attrIsDir,
-			AttrValue: isDirEntry(path, entry),
-		})
-
-		attrs = append(attrs, app.Attribute{
-			AttrName:  attrType,
-			AttrValue: entry.Type(),
-		})
-
-		attributeList = append(attributeList, attrs)
+		attributeList = append(attributeList, entryAttributes(path, entry))
 	}
 
 	return attributeList, nil
+}
+
+// entryAttributes builds the listing row for one entry: its name, a
+// human-readable size (or <DIR> for a directory), and the modification date and
+// time. The directory flag is carried as a hidden attribute.
+func entryAttributes(path string, entry os.DirEntry) app.AttributeList {
+	isDir := isDirEntry(path, entry)
+
+	var size any = ""
+	if isDir {
+		size = dirSizeValue
+	}
+
+	date := ""
+	clock := ""
+
+	info, err := entry.Info()
+	if err == nil {
+		if !isDir {
+			size = app.Size(info.Size())
+		}
+
+		modTime := info.ModTime()
+		date = modTime.Format(dateLayout)
+		clock = modTime.Format(timeLayout)
+	}
+
+	return app.AttributeList{
+		{AttrName: attrName, AttrValue: entry.Name()},
+		{AttrName: attrSize, AttrValue: size},
+		{AttrName: attrDate, AttrValue: date},
+		{AttrName: attrTime, AttrValue: clock},
+		{AttrName: attrIsDir, AttrValue: isDir, Hidden: true},
+	}
 }
 
 // isDirEntry reports whether the entry is a directory, following a symbolic

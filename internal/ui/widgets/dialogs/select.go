@@ -19,6 +19,7 @@ type Select struct {
 	cursor   int
 	selected map[int]bool
 	multi    bool
+	canceled bool
 
 	done chan struct{}
 }
@@ -38,27 +39,8 @@ func (m *Select) Init() tea.Cmd {
 }
 
 func (m *Select) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyUp:
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case tea.KeyDown:
-			if m.cursor < len(m.options)-1 {
-				m.cursor++
-			}
-		case tea.KeySpace:
-			if m.multi {
-				m.selected[m.cursor] = !m.selected[m.cursor]
-			}
-		case tea.KeyEnter:
-			if m.visible {
-				m.visible = false
-				m.done <- struct{}{}
-			}
-		}
+	if key, ok := msg.(tea.KeyMsg); ok {
+		m.handleKey(key)
 	}
 
 	return m, nil
@@ -91,7 +73,7 @@ func (m *Select) View() string {
 		line := cursor + " " + marker + " " + option
 
 		if index == m.cursor {
-			line = m.styles.ActiveButtonStyle.Render(line)
+			line = m.styles.CursorStyle.Render(line)
 		}
 
 		lines = append(lines, line)
@@ -104,6 +86,12 @@ func (m *Select) View() string {
 	}
 
 	return m.render(body)
+}
+
+// Canceled reports whether the dialog was closed with Escape instead of a
+// choice.
+func (m *Select) Canceled() bool {
+	return m.canceled
 }
 
 func (m *Select) SetText(text string) {
@@ -132,4 +120,37 @@ func (m *Select) Selections() []string {
 
 func (m *Select) Done() chan struct{} {
 	return m.done
+}
+
+func (m *Select) handleKey(msg tea.KeyMsg) {
+	switch msg.Type {
+	case tea.KeyUp:
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case tea.KeyDown:
+		if m.cursor < len(m.options)-1 {
+			m.cursor++
+		}
+	case tea.KeySpace:
+		if m.multi {
+			m.selected[m.cursor] = !m.selected[m.cursor]
+		}
+	case tea.KeyEnter:
+		m.close(false)
+	case tea.KeyEsc:
+		m.close(true)
+	}
+}
+
+// close hides the dialog and signals Done; canceled records an Escape.
+func (m *Select) close(canceled bool) {
+	if !m.visible {
+		return
+	}
+
+	m.canceled = canceled
+	m.visible = false
+
+	m.done <- struct{}{}
 }

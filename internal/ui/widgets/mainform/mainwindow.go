@@ -122,15 +122,48 @@ func (m *Model) Panel() *panel.Model {
 	return p
 }
 
+// FocusedPanel returns the panel window that currently holds focus, or nil when
+// no panel is focused.
+func (m *Model) FocusedPanel() *panel.Model {
+	for _, win := range m.wm.Windows() {
+		if !win.Focused {
+			continue
+		}
+
+		if p, ok := win.Content.(*panel.Model); ok {
+			return p
+		}
+	}
+
+	return nil
+}
+
 func (m *Model) Width() int  { return m.width }
 func (m *Model) Height() int { return m.height }
 
+// dialogOpen reports whether a dialog window (not a panel) currently holds
+// focus.
+func (m *Model) dialogOpen() bool {
+	id := m.wm.FocusedWindowID()
+
+	return id >= 0 && id != m.leftPanelID && id != m.rightPanelID
+}
+
 // handleKey routes keys between the function-button bar and the window
 // manager. Function keys activate their button before windows see them;
-// arrows and Enter drive the bar only while it holds keyboard focus.
+// arrows and Enter drive the bar only while it holds keyboard focus. While a
+// modal dialog is open, F1-F9 are ignored and other keys go to the dialog.
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	if msg.Type == tea.KeyF10 {
 		return tea.Quit, true
+	}
+
+	if m.dialogOpen() {
+		if _, ok := buttonbar.ActionForKey(msg.Type); ok {
+			return nil, true
+		}
+
+		return nil, false
 	}
 
 	if _, ok := buttonbar.ActionForKey(msg.Type); ok {
@@ -164,6 +197,11 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Cmd, bool) {
 	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
 		return nil, false
+	}
+
+	if m.dialogOpen() {
+		// A modal dialog owns the pointer: clicks outside it are ignored.
+		return nil, true
 	}
 
 	if msg.Y == m.height-functionBarHeight {

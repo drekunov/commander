@@ -8,6 +8,18 @@ import (
 	"github.com/drekunov/gc/internal/config"
 )
 
+// titleOpen and titleClose decorate a window title in its title bar.
+const (
+	titleOpen  = "[ "
+	titleClose = " ]"
+)
+
+// TitleWidth returns the rendered width of a window title including its
+// decoration, so a window can be sized to keep its title untruncated.
+func TitleWidth(title string) int {
+	return lipgloss.Width(titleOpen + title + titleClose)
+}
+
 // renderer draws a window's frame, title bar, and resize grip using the
 // configured theme. It is a pure state-to-string transform.
 type renderer struct {
@@ -92,7 +104,7 @@ func (r *renderer) buildTitleBar(win *Window, innerW int) string {
 	borderFg := r.styles.DialogBoxStyle.GetBorderBottomForeground()
 
 	// NC-style title: [ Title ]
-	title := "[ " + win.Title + " ]"
+	title := titleOpen + win.Title + titleClose
 
 	titleLen := lipgloss.Width(title)
 	if titleLen > innerW {

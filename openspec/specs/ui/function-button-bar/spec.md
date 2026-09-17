@@ -33,7 +33,7 @@ The bar SHALL display ten buttons, ordered left to right, each labeled with its 
 - **THEN** the bar still renders as a single row that ends at the right edge of the screen without wrapping or corrupting the display
 
 ### Requirement: Function keys activate their matching button
-Pressing a function key F1 through F10 SHALL activate the button with the same number (F1 activates 1Help, ..., F10 activates 10Quit), regardless of which window or panel currently has focus.
+Pressing a function key F1 through F10 SHALL activate the button with the same number (F1 activates 1Help, ..., F10 activates 10Quit), regardless of which window or panel currently has focus, except while a dialog is open: then F1 through F9 SHALL NOT activate a button. F10 SHALL always quit.
 
 #### Scenario: Function key activates its button
 - **WHEN** the user presses a function key while any panel is focused
@@ -42,6 +42,10 @@ Pressing a function key F1 through F10 SHALL activate the button with the same n
 #### Scenario: Focused button key map
 - **WHEN** the user presses F10
 - **THEN** the 10Quit button is activated and the application quits
+
+#### Scenario: Dialog blocks function keys
+- **WHEN** a dialog is open and the user presses F1 through F9
+- **THEN** no button is activated and the dialog stays open
 
 ### Requirement: Buttons are reachable and activate by mouse click
 The system SHALL accept a mouse click on a rendered button as an activation of that button, and SHALL support keyboard focus navigation across the bar so the focused button can be activated with Enter.
@@ -62,7 +66,7 @@ When a button is activated, the system SHALL briefly render it in its pressed st
 - **THEN** the button is shown in its pressed styling at the moment of activation
 
 ### Requirement: Non-quit actions are mocks that report their name
-Activating any button from 1Help through 9PullDn SHALL run a placeholder mock action that reports which action was requested without performing a real file operation, and SHALL NOT modify any file, directory, panel data, or the application state.
+Activating any button from 1Help through 9PullDn, except the Menu button, SHALL run a placeholder mock action that reports which action was requested without performing a real file operation, and SHALL NOT modify any file, directory, panel data, or the application state. The Menu button SHALL instead open the panel sort window.
 
 #### Scenario: Mock action reports its name
 - **WHEN** the user activates a non-quit button such as 5Copy
@@ -71,6 +75,10 @@ Activating any button from 1Help through 9PullDn SHALL run a placeholder mock ac
 #### Scenario: Mock activation is safe on an empty selection
 - **WHEN** the user activates a non-quit button while no file entry is selected
 - **THEN** the mock action still reports its placeholder result and the application does not crash or error
+
+#### Scenario: Menu selects the sort mode
+- **WHEN** the user activates the Menu button
+- **THEN** the focused panel's sort window opens and no mock dialog is shown
 
 ### Requirement: Mock actions expose a replaceable action contract
 The system SHALL route every button activation through a single action-dispatch mechanism so that replacing a mock behavior with a real implementation does not change how buttons are rendered, focused, or activated.
