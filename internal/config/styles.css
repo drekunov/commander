@@ -49,3 +49,27 @@
     color: #00AAAA;
     background-color: #000080;
 }
+
+.cursor {
+    color: #000000;
+    background-color: #008080;
+    font-weight: bold;
+}
+
+.menu-label {
+    color: #000000;
+    background-color: #008080;
+    font-weight: bold;
+}
+
+.menu-number {
+    color: #C0C0C0;
+    background-color: #000000;
+    font-weight: bold;
+}
+
+.menu-background {
+    color: #C0C0C0;
+    background-color: #000000;
+    font-weight: bold;
+}

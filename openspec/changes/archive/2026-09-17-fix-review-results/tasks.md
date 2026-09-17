@@ -47,4 +47,4 @@
 
 - [x] 8.1 Run `go build ./...`, `go vet ./...`, and `go test -race ./...` and keep them green.
 - [x] 8.2 Run `make lint` (rewrites in place) and confirm golangci-lint passes.
-- [ ] 8.3 Manual smoke via `make run`: quit with an error dialog open exits cleanly; only the focused panel shows a cursor; the bar strip background is visible.
+- [x] 8.3 Manual smoke via `make run`: quit with an error dialog open exits cleanly; only the focused panel shows a cursor; the bar strip background is visible.

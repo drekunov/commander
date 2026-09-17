@@ -11,14 +11,18 @@ import (
 var defaultCSS string
 
 type Styles struct {
-	ButtonStyle        lipgloss.Style
-	ActiveButtonStyle  lipgloss.Style
-	PressedButtonStyle lipgloss.Style
-	DialogBoxStyle     lipgloss.Style
-	TextStyle          lipgloss.Style
-	InputStyle         lipgloss.Style
-	TableStyle         lipgloss.Style
-	ButtonBarStyle     lipgloss.Style
+	ButtonStyle         lipgloss.Style
+	ActiveButtonStyle   lipgloss.Style
+	PressedButtonStyle  lipgloss.Style
+	DialogBoxStyle      lipgloss.Style
+	TextStyle           lipgloss.Style
+	InputStyle          lipgloss.Style
+	TableStyle          lipgloss.Style
+	ButtonBarStyle      lipgloss.Style
+	CursorStyle         lipgloss.Style
+	MenuLabelStyle      lipgloss.Style
+	MenuNumberStyle     lipgloss.Style
+	MenuBackgroundStyle lipgloss.Style
 }
 
 // LoadStyles builds the theme, applying a styles.css override from the
@@ -35,13 +39,17 @@ func LoadStyles() (Styles, error) {
 	stylesheet := ParseCSS(cssData)
 
 	return Styles{
-		ButtonStyle:        ApplyStyle(stylesheet[".button"]),
-		ActiveButtonStyle:  ApplyStyle(stylesheet[".active-button"]),
-		PressedButtonStyle: ApplyStyle(stylesheet[".pressed-button"]),
-		DialogBoxStyle:     ApplyStyle(stylesheet[".dialog-box"]),
-		TextStyle:          ApplyStyle(stylesheet[".text"]),
-		InputStyle:         ApplyStyle(stylesheet[".input"]),
-		TableStyle:         ApplyStyle(stylesheet[".table"]),
-		ButtonBarStyle:     ApplyStyle(stylesheet[".button-bar"]),
+		ButtonStyle:         ApplyStyle(stylesheet[".button"]),
+		ActiveButtonStyle:   ApplyStyle(stylesheet[".active-button"]),
+		PressedButtonStyle:  ApplyStyle(stylesheet[".pressed-button"]),
+		DialogBoxStyle:      ApplyStyle(stylesheet[".dialog-box"]),
+		TextStyle:           ApplyStyle(stylesheet[".text"]),
+		InputStyle:          ApplyStyle(stylesheet[".input"]),
+		TableStyle:          ApplyStyle(stylesheet[".table"]),
+		ButtonBarStyle:      ApplyStyle(stylesheet[".button-bar"]),
+		CursorStyle:         ApplyStyle(stylesheet[".cursor"]),
+		MenuLabelStyle:      ApplyStyle(stylesheet[".menu-label"]),
+		MenuNumberStyle:     ApplyStyle(stylesheet[".menu-number"]),
+		MenuBackgroundStyle: ApplyStyle(stylesheet[".menu-background"]),
 	}, nil
 }

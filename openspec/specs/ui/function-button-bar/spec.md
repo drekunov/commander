@@ -78,3 +78,47 @@ The system SHALL route every button activation through a single action-dispatch 
 #### Scenario: Mock handler can be swapped for a real one
 - **WHEN** a mock action's behavior is replaced by a real action implementation
 - **THEN** the button's label, focus handling, and key and mouse activation continue to work unchanged
+
+### Requirement: Button labels use the injected menu-label style
+The bar SHALL render each button's label split into its numeric prefix and its name. For a button that is neither focused nor pressed, the numeric prefix SHALL use the injected menu-number style and the name SHALL use the injected menu-label style, both drawn on the bar's menu-background base. When the button is focused or pressed, the numeric prefix SHALL keep the menu-number style while the name SHALL use the active or pressed style. The focused and pressed buttons SHALL keep their distinct active and pressed styles for the name.
+
+#### Scenario: Default labels use the menu-label style on the strip
+- **WHEN** the bar renders a button that is neither focused nor pressed
+- **THEN** its name uses the menu-label style and its numeric prefix uses the menu-number style, while the surrounding bar background keeps the menu-background style
+
+#### Scenario: Focused and pressed labels stay distinct
+- **WHEN** a button is focused or pressed
+- **THEN** its numeric prefix still uses the menu-number style and its name uses the active or pressed style rather than the menu-label style
+
+#### Scenario: Labels follow a theme override
+- **WHEN** the injected menu-number or menu-label style defines colors different from the embedded default
+- **THEN** the number and name render with those colors
+
+### Requirement: Bar renders a full-width themed background
+The bar SHALL paint its full-width background using the injected menu-background style across the bottom row, falling back to the button-bar style for any attribute the menu-background style leaves unset. The ten buttons SHALL be drawn on top of it.
+
+#### Scenario: Background strip spans the bar row
+- **WHEN** the bar is rendered
+- **THEN** the full width of the bottom row is painted with the menu-background style and the ten buttons overlay it
+
+### Requirement: Mock activation does not stack dialogs
+Repeatedly activating non-quit buttons while a mock result dialog is already open SHALL NOT open additional dialogs, and SHALL NOT accumulate idle goroutines.
+
+#### Scenario: Repeated activation shows a single mock dialog
+- **WHEN** the user activates a non-quit button several times in quick succession
+- **THEN** at most one mock result dialog is open at a time and no dialog or goroutine accumulates
+
+### Requirement: Buttons have equal width
+The bar SHALL lay its ten buttons out with equal width. Each button SHALL render its function-key number in a two-cell field followed by its name in a six-cell field, and any columns left over after the ten buttons SHALL be split into equal gaps between adjacent buttons so the row spans the full terminal width. When the terminal is too narrow for ten eight-cell buttons, the buttons SHALL shrink to equal widths and labels SHALL be truncated to fit.
+
+#### Scenario: All buttons share one width
+- **WHEN** the bar renders at a width that fits ten eight-cell buttons
+- **THEN** every button occupies the same number of columns, with its number in a two-cell field and its name in a six-cell field
+
+#### Scenario: Leftover columns become equal gaps
+- **WHEN** the terminal width leaves columns unused after the ten buttons
+- **THEN** those columns are split into equal gaps between adjacent buttons and the row still spans the full width
+
+#### Scenario: Narrow terminal shrinks buttons equally
+- **WHEN** the terminal is too narrow for ten eight-cell buttons
+- **THEN** the buttons shrink to equal widths and each label is truncated to fit

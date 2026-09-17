@@ -12,7 +12,6 @@ import (
 var errBoom = errors.New("boom")
 
 const (
-	attrPath  = "path"
 	attrName  = "Name"
 	attrIsDir = "IsDir"
 )
@@ -141,7 +140,6 @@ func waitForData(t *testing.T, uiFake *fakeUI) setDataCall {
 
 func rows(names ...string) []app.AttributeList {
 	header := app.AttributeList{
-		{AttrName: attrPath, AttrValue: attrPath},
 		{AttrName: attrName, AttrValue: attrName},
 		{AttrName: attrIsDir, AttrValue: attrIsDir},
 	}
@@ -151,7 +149,6 @@ func rows(names ...string) []app.AttributeList {
 
 	for _, name := range names {
 		out = append(out, app.AttributeList{
-			{AttrName: attrPath, AttrValue: "/"},
 			{AttrName: attrName, AttrValue: name},
 			{AttrName: attrIsDir, AttrValue: false},
 		})

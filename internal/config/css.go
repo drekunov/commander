@@ -49,6 +49,10 @@ func ApplyStyle(props map[string]string) lipgloss.Style {
 		style = style.Underline(true)
 	}
 
+	if val, ok := props["font-weight"]; ok && val == "bold" {
+		style = style.Bold(true)
+	}
+
 	if val, ok := props["padding"]; ok {
 		top, right, bottom, left := parseBox(val)
 		style = style.Padding(top, right, bottom, left)
@@ -59,6 +63,11 @@ func ApplyStyle(props map[string]string) lipgloss.Style {
 		style = style.Margin(top, right, bottom, left)
 	}
 
+	return applyBorder(style, props)
+}
+
+// applyBorder applies the border-style and border-color properties.
+func applyBorder(style lipgloss.Style, props map[string]string) lipgloss.Style {
 	if val, ok := props["border-style"]; ok {
 		border := parseBorder(val)
 		style = style.Border(border).
