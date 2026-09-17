@@ -87,3 +87,93 @@ func TestApplyStyle(t *testing.T) {
 		t.Error("border style not applied")
 	}
 }
+
+func TestApplyStyleBold(t *testing.T) {
+	t.Parallel()
+
+	bold := config.ApplyStyle(map[string]string{"font-weight": "bold"})
+	if !bold.GetBold() {
+		t.Error("font-weight: bold did not apply bold")
+	}
+
+	plain := config.ApplyStyle(map[string]string{"color": "#000000"})
+	if plain.GetBold() {
+		t.Error("style without font-weight should not be bold")
+	}
+}
+
+//nolint:paralleltest // t.Chdir mutates the process-global working directory
+func TestLoadStylesCursorAndMenuLabel(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	styles, err := config.LoadStyles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name  string
+		style lipgloss.Style
+	}{
+		{name: "cursor", style: styles.CursorStyle},
+		{name: "menu-label", style: styles.MenuLabelStyle},
+	}
+
+	for _, testCase := range cases {
+		if testCase.style.GetForeground() != lipgloss.Color("#000000") {
+			t.Errorf("%s foreground = %v, want #000000", testCase.name, testCase.style.GetForeground())
+		}
+
+		if testCase.style.GetBackground() != lipgloss.Color("#008080") {
+			t.Errorf("%s background = %v, want #008080", testCase.name, testCase.style.GetBackground())
+		}
+
+		if !testCase.style.GetBold() {
+			t.Errorf("%s style is not bold", testCase.name)
+		}
+	}
+}
+
+//nolint:paralleltest // t.Chdir mutates the process-global working directory
+func TestLoadStylesMenuNumber(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	styles, err := config.LoadStyles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if styles.MenuNumberStyle.GetForeground() != lipgloss.Color("#C0C0C0") {
+		t.Errorf("menu-number foreground = %v, want #C0C0C0", styles.MenuNumberStyle.GetForeground())
+	}
+
+	if styles.MenuNumberStyle.GetBackground() != lipgloss.Color("#000000") {
+		t.Errorf("menu-number background = %v, want #000000", styles.MenuNumberStyle.GetBackground())
+	}
+
+	if !styles.MenuNumberStyle.GetBold() {
+		t.Error("menu-number style is not bold")
+	}
+}
+
+//nolint:paralleltest // t.Chdir mutates the process-global working directory
+func TestLoadStylesMenuBackground(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	styles, err := config.LoadStyles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if styles.MenuBackgroundStyle.GetForeground() != lipgloss.Color("#C0C0C0") {
+		t.Errorf("menu-background foreground = %v, want #C0C0C0", styles.MenuBackgroundStyle.GetForeground())
+	}
+
+	if styles.MenuBackgroundStyle.GetBackground() != lipgloss.Color("#000000") {
+		t.Errorf("menu-background background = %v, want #000000", styles.MenuBackgroundStyle.GetBackground())
+	}
+
+	if !styles.MenuBackgroundStyle.GetBold() {
+		t.Error("menu-background style is not bold")
+	}
+}

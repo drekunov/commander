@@ -19,21 +19,7 @@ const (
 
 	attrName  = "Name"
 	attrIsDir = "IsDir"
-	attrPath  = "path"
 )
-
-// ncTableStyles returns the table styles matching the Norton Commander look:
-// the cursor is a black-on-gray bar instead of bubbles' default magenta.
-func ncTableStyles() table.Styles {
-	styles := table.DefaultStyles()
-
-	styles.Selected = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#000000")).
-		Background(lipgloss.Color("#C0C0C0"))
-
-	return styles
-}
 
 // DataMsg delivers a listing for one panel through the tea event loop so the
 // table state is only ever touched from the Bubble Tea goroutine.
@@ -62,6 +48,11 @@ type Model struct {
 	dir  string
 	rows []app.AttributeList
 
+	// pendingSelect names the entry to place the cursor on when the next
+	// listing arrives: set when ascending so the directory just left is
+	// reselected, then cleared once the listing is applied.
+	pendingSelect string
+
 	// colTitles holds the column titles of the last delivered header row so a
 	// synthetic parent (..) row can be built for any connector schema.
 	colTitles []string
@@ -86,7 +77,7 @@ func NewPanel(styles config.Styles) *Model {
 		styles:    styles,
 	}
 
-	model.tableView.SetStyles(ncTableStyles())
+	model.tableView.SetStyles(model.tableStyles())
 	model.tableView.KeyMap = navigationKeyMap()
 
 	return model
@@ -141,8 +132,10 @@ func (m *Model) View() string {
 
 // SetData rebuilds the table for dir from a listing whose first row is the
 // column header and whose remaining rows are one directory entry each. When
-// the directory has a parent, a synthetic ".." row leads the listing; the
-// cursor is reset to the first row after a reload.
+// the directory has a parent, a synthetic ".." row leads the listing. The
+// cursor is restored to the directory that was just left when ascending, and
+// placed on the first row otherwise. The listing is scrolled so the selected
+// row is visible, including the restored directory after an ascent.
 func (m *Model) SetData(dir string, data []app.AttributeList) {
 	m.dir = dir
 
@@ -156,7 +149,8 @@ func (m *Model) SetData(dir string, data []app.AttributeList) {
 	}
 
 	m.tableView.SetRows(m.displayRowsFor(m.rows))
-	m.tableView.SetCursor(0)
+	m.positionCursor(m.cursorForPendingSelect())
+	m.pendingSelect = ""
 }
 
 func (m *Model) SetVisible(visible bool) {
@@ -171,14 +165,28 @@ func (m *Model) SetHeight(height int) {
 	m.height = height
 }
 
-// tableStyles returns the table styles for the current focus state. The
-// bubbles table highlights the cursor row regardless of focus, so a blurred
-// panel renders that row unstyled to hide its cursor. A focused panel spans the
-// cursor bar across the full panel width so the viewport's horizontal padding
-// stays gray instead of leaking as unstyled cells after the selected row's
-// style reset.
+// positionCursor places the table cursor on display row idx and scrolls the
+// listing so that row is visible. GotoTop resets both the cursor and the
+// viewport offset; MoveDown then advances the cursor while keeping it in view.
+// This keeps the restored directory visible after an ascent even when the
+// parent listing is taller than the panel.
+func (m *Model) positionCursor(idx int) {
+	m.tableView.GotoTop()
+	m.tableView.MoveDown(idx)
+}
+
+// tableStyles returns the table styles for the current focus state. The cursor
+// is drawn from the injected cursor style, and the header row is given the
+// injected table background so it stays continuous with the listing in both
+// focus states. The bubbles table highlights the cursor row regardless of
+// focus, so a blurred panel renders that row unstyled to hide its cursor. A
+// focused panel spans the cursor bar across the full panel width so the
+// viewport's horizontal padding stays painted with the cursor background
+// instead of leaking as unstyled cells after the selected row's style reset.
 func (m *Model) tableStyles() table.Styles {
-	styles := ncTableStyles()
+	styles := table.DefaultStyles()
+	styles.Header = styles.Header.Background(m.styles.TableStyle.GetBackground())
+	styles.Selected = m.styles.CursorStyle
 
 	if !m.tableView.Focused() {
 		styles.Selected = lipgloss.NewStyle()
@@ -222,12 +230,12 @@ func contentWidthOf(cols []table.Column) int {
 }
 
 // navigationKeyMap extends the default table keymap so Left jumps the cursor
-// to the first row and Right steps one row down.
+// to the first row and Right jumps the cursor to the last row.
 func navigationKeyMap() table.KeyMap {
 	keyMap := table.DefaultKeyMap()
 
 	keyMap.GotoTop.SetKeys(append([]string{"left"}, keyMap.GotoTop.Keys()...)...)
-	keyMap.LineDown.SetKeys(append([]string{"right"}, keyMap.LineDown.Keys()...)...)
+	keyMap.GotoBottom.SetKeys(append([]string{"right"}, keyMap.GotoBottom.Keys()...)...)
 
 	return keyMap
 }
@@ -287,6 +295,28 @@ func (m *Model) showParent() bool {
 	}
 
 	return filepath.Dir(m.dir) != m.dir
+}
+
+// cursorForPendingSelect returns the display-row index of the entry named by
+// pendingSelect, offset by the synthetic parent row when it is shown. It
+// returns 0 when there is nothing to reselect or the entry is absent.
+func (m *Model) cursorForPendingSelect() int {
+	if m.pendingSelect == "" {
+		return 0
+	}
+
+	offset := 0
+	if m.showParent() {
+		offset = 1
+	}
+
+	for idx, entry := range m.rows {
+		if entryName(entry) == m.pendingSelect {
+			return idx + offset
+		}
+	}
+
+	return 0
 }
 
 // displayRowsFor renders the synthetic parent row (when applicable) followed
@@ -358,10 +388,6 @@ func (m *Model) parentRow() table.Row {
 		row[idx] = parentIsDirValue
 	}
 
-	if idx := titleIndex(titles, attrPath); idx >= 0 {
-		row[idx] = m.dir
-	}
-
 	row[nameIdx] = parentLabel
 
 	return row
@@ -407,6 +433,8 @@ func (m *Model) navigationCmd(msg tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 
+		m.pendingSelect = ""
+
 		return NavigateMsg{Panel: m.id, Dir: filepath.Join(m.dir, entryName(entry))}.Cmd()
 
 	case tea.KeyBackspace:
@@ -427,6 +455,8 @@ func (m *Model) ascendCmd() tea.Cmd {
 	if parent == m.dir {
 		return nil
 	}
+
+	m.pendingSelect = filepath.Base(m.dir)
 
 	return NavigateMsg{Panel: m.id, Dir: parent}.Cmd()
 }

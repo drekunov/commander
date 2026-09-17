@@ -2,6 +2,7 @@
 package panel
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -147,7 +148,7 @@ func TestEnterOnFileEmitsNothing(t *testing.T) {
 	model.SetData("/etc", testListing("fhosts", "fpasswd", "d:sub"))
 
 	model.Focus()
-	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
 	model = mustPanelModel(t, updated)
 
 	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -190,6 +191,125 @@ func TestBackspaceAtRootEmitsNothing(t *testing.T) {
 	}
 }
 
+func TestBackspaceRestoresCursorToChild(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetPanelID(app.PanelLeft)
+	model.Focus()
+
+	model.SetData("/a", testListing("d:b", "f1"))
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = mustPanelModel(t, updated)
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = mustPanelModel(t, updated)
+
+	model.SetData("/a/b", testListing("d:c", "f2"))
+
+	if model.tableView.Cursor() != 0 {
+		t.Fatalf("cursor after descending = %d, want 0", model.tableView.Cursor())
+	}
+
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if cmd == nil {
+		t.Fatal("Backspace produced no command")
+	}
+
+	model.SetData("/a", testListing("d:b", "f1"))
+
+	if model.tableView.Cursor() != 1 {
+		t.Errorf("cursor after ascent = %d, want 1 (entry b)", model.tableView.Cursor())
+	}
+}
+
+func TestEnterOnParentRowRestoresCursorToChild(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetPanelID(app.PanelLeft)
+	model.Focus()
+
+	model.SetData("/a/b", testListing("d:c"))
+
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("Enter on the parent row produced no command")
+	}
+
+	model.SetData("/a", testListing("d:b", "f1"))
+
+	if model.tableView.Cursor() != 1 {
+		t.Errorf("cursor after ascent = %d, want 1 (entry b)", model.tableView.Cursor())
+	}
+}
+
+func TestAscendRestoresCursorAtEachLevel(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetPanelID(app.PanelLeft)
+	model.Focus()
+
+	model.SetData("/a", testListing("d:b"))
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = mustPanelModel(t, updated)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = mustPanelModel(t, updated)
+
+	model.SetData("/a/b", testListing("d:c"))
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = mustPanelModel(t, updated)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = mustPanelModel(t, updated)
+
+	model.SetData("/a/b/c", testListing("f1"))
+
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if cmd == nil {
+		t.Fatal("Backspace produced no command")
+	}
+
+	model.SetData("/a/b", testListing("d:c"))
+
+	if model.tableView.Cursor() != 1 {
+		t.Fatalf("cursor in /a/b = %d, want 1 (entry c)", model.tableView.Cursor())
+	}
+
+	_, cmd = model.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if cmd == nil {
+		t.Fatal("Backspace produced no command")
+	}
+
+	model.SetData("/a", testListing("d:b"))
+
+	if model.tableView.Cursor() != 1 {
+		t.Errorf("cursor in /a = %d, want 1 (entry b)", model.tableView.Cursor())
+	}
+}
+
+func TestAscendFallsBackWhenChildMissing(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetPanelID(app.PanelLeft)
+	model.Focus()
+
+	model.SetData("/a/b", testListing("f1"))
+
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if cmd == nil {
+		t.Fatal("Backspace produced no command")
+	}
+
+	model.SetData("/a", testListing("f1", "f2"))
+
+	if model.tableView.Cursor() != 0 {
+		t.Errorf("cursor after ascent = %d, want 0 (fallback)", model.tableView.Cursor())
+	}
+}
+
 func TestReloadResetsCursorToTop(t *testing.T) {
 	t.Parallel()
 
@@ -197,11 +317,11 @@ func TestReloadResetsCursorToTop(t *testing.T) {
 	model.SetData("/", testListing("fa", "fb", "fc"))
 	model.Focus()
 
-	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
 	model = mustPanelModel(t, updated)
 
 	if model.tableView.Cursor() != 1 {
-		t.Fatalf("cursor = %d, want 1 after one Right", model.tableView.Cursor())
+		t.Fatalf("cursor = %d, want 1 after one Down", model.tableView.Cursor())
 	}
 
 	model.SetData("/a", testListing("dx", "dy"))
@@ -211,7 +331,7 @@ func TestReloadResetsCursorToTop(t *testing.T) {
 	}
 }
 
-func TestRightMovesDownAndClamps(t *testing.T) {
+func TestRightJumpsToBottom(t *testing.T) {
 	t.Parallel()
 
 	model := NewPanel(config.Styles{})
@@ -221,17 +341,30 @@ func TestRightMovesDownAndClamps(t *testing.T) {
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
 	model = mustPanelModel(t, updated)
 
-	if model.tableView.Cursor() != 1 {
-		t.Errorf("cursor after Right = %d, want 1", model.tableView.Cursor())
+	if model.tableView.Cursor() != 2 {
+		t.Errorf("cursor after Right = %d, want last row 2", model.tableView.Cursor())
 	}
+}
 
-	for range 2 {
-		updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRight})
-		model = mustPanelModel(t, updated)
-	}
+func TestRightOnLastRowStaysPut(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetData("/", testListing("fa", "fb", "fc"))
+	model.Focus()
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
+	model = mustPanelModel(t, updated)
 
 	if model.tableView.Cursor() != 2 {
-		t.Errorf("cursor after extra Rights = %d, want last row 2", model.tableView.Cursor())
+		t.Fatalf("cursor = %d, want last row 2 before extra Right", model.tableView.Cursor())
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRight})
+	model = mustPanelModel(t, updated)
+
+	if model.tableView.Cursor() != 2 {
+		t.Errorf("cursor after Right on last row = %d, want 2", model.tableView.Cursor())
 	}
 }
 
@@ -243,7 +376,7 @@ func TestLeftJumpsToTop(t *testing.T) {
 	model.Focus()
 
 	for range 2 {
-		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
+		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
 		model = mustPanelModel(t, updated)
 	}
 
@@ -256,6 +389,28 @@ func TestLeftJumpsToTop(t *testing.T) {
 
 	if model.tableView.Cursor() != 0 {
 		t.Errorf("cursor after Left = %d, want 0", model.tableView.Cursor())
+	}
+}
+
+func TestUpAndDownStepOneRow(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetData("/", testListing("fa", "fb", "fc"))
+	model.Focus()
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = mustPanelModel(t, updated)
+
+	if model.tableView.Cursor() != 1 {
+		t.Fatalf("cursor after one Down = %d, want 1", model.tableView.Cursor())
+	}
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyUp})
+	model = mustPanelModel(t, updated)
+
+	if model.tableView.Cursor() != 0 {
+		t.Errorf("cursor after one Up = %d, want 0", model.tableView.Cursor())
 	}
 }
 
@@ -402,7 +557,7 @@ func TestEmptyDirectoryShowsParentRow(t *testing.T) {
 func TestBlurHidesCursor(t *testing.T) {
 	t.Parallel()
 
-	model := NewPanel(config.Styles{})
+	model := NewPanel(config.Styles{CursorStyle: lipgloss.NewStyle().Background(lipgloss.Color("#C0C0C0"))})
 	model.SetData("/", testListing("fa", "fb"))
 	model.SetWidth(40)
 	model.SetHeight(10)
@@ -419,5 +574,154 @@ func TestBlurHidesCursor(t *testing.T) {
 
 	if blurred != lipgloss.NewStyle().GetBackground() {
 		t.Error("blurred panel still renders a cursor highlight")
+	}
+}
+
+// tallListing returns a listing of n files followed by a directory named
+// target, so the listing is taller than a small panel viewport.
+func tallListing(n int) []app.AttributeList {
+	names := make([]string, 0, n+1)
+	for i := range n {
+		names = append(names, fmt.Sprintf("file%02d", i))
+	}
+
+	return testListing(append(names, "d:target")...)
+}
+
+func TestAscendScrollsRestoredEntryIntoView(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetPanelID(app.PanelLeft)
+	model.SetWidth(40)
+	model.SetHeight(5)
+	model.Focus()
+
+	listing := tallListing(19)
+
+	model.SetData("/a", listing)
+
+	// Render once so the panel applies its viewport size, as the app does
+	// every frame, before navigating.
+	model.View()
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRight})
+	model = mustPanelModel(t, updated)
+
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = mustPanelModel(t, updated)
+
+	model.SetData("/a/target", nil)
+	model.View()
+
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if cmd == nil {
+		t.Fatal("Backspace produced no command")
+	}
+
+	model.SetData("/a", listing)
+
+	if model.tableView.Cursor() != 20 {
+		t.Fatalf("cursor after ascent = %d, want 20 (entry target)", model.tableView.Cursor())
+	}
+
+	if view := model.View(); !strings.Contains(view, "target") {
+		t.Errorf("restored entry not visible in rendered view:\n%s", view)
+	}
+}
+
+func TestReloadShowsFirstRow(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetWidth(40)
+	model.SetHeight(5)
+	model.Focus()
+
+	listing := tallListing(19)
+
+	model.SetData("/", listing)
+
+	// Render once so the panel applies its viewport size, as the app does
+	// every frame, before scrolling.
+	model.View()
+
+	for range 19 {
+		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+		model = mustPanelModel(t, updated)
+	}
+
+	model.SetData("/", listing)
+
+	if view := model.View(); !strings.Contains(view, "file00") {
+		t.Errorf("first row not visible after reload:\n%s", view)
+	}
+}
+
+func TestFocusedHeaderSharesTableBackground(t *testing.T) {
+	t.Parallel()
+
+	tableBackground := lipgloss.Color("#000080")
+	model := NewPanel(config.Styles{TableStyle: lipgloss.NewStyle().Background(tableBackground)})
+	model.Focus()
+
+	if got := model.tableStyles().Header.GetBackground(); got != tableBackground {
+		t.Errorf("focused header background = %v, want %v", got, tableBackground)
+	}
+}
+
+func TestBlurredHeaderSharesTableBackground(t *testing.T) {
+	t.Parallel()
+
+	tableBackground := lipgloss.Color("#000080")
+	model := NewPanel(config.Styles{TableStyle: lipgloss.NewStyle().Background(tableBackground)})
+	model.Focus()
+	model.Blur()
+
+	if got := model.tableStyles().Header.GetBackground(); got != tableBackground {
+		t.Errorf("blurred header background = %v, want %v", got, tableBackground)
+	}
+}
+
+func TestHeaderFollowsCustomTableBackground(t *testing.T) {
+	t.Parallel()
+
+	tableBackground := lipgloss.Color("#123456")
+	model := NewPanel(config.Styles{TableStyle: lipgloss.NewStyle().Background(tableBackground)})
+
+	if got := model.tableStyles().Header.GetBackground(); got != tableBackground {
+		t.Errorf("header background = %v, want injected %v", got, tableBackground)
+	}
+}
+
+func TestCursorUsesInjectedStyle(t *testing.T) {
+	t.Parallel()
+
+	cursor := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#000000")).
+		Background(lipgloss.Color("#C0C0C0"))
+
+	model := NewPanel(config.Styles{CursorStyle: cursor})
+	model.Focus()
+
+	got := model.tableStyles().Selected
+
+	if got.GetBackground() != cursor.GetBackground() {
+		t.Errorf("cursor background = %v, want %v", got.GetBackground(), cursor.GetBackground())
+	}
+
+	if got.GetForeground() != cursor.GetForeground() {
+		t.Errorf("cursor foreground = %v, want %v", got.GetForeground(), cursor.GetForeground())
+	}
+
+	if got.GetBold() != cursor.GetBold() {
+		t.Errorf("cursor bold = %v, want %v", got.GetBold(), cursor.GetBold())
+	}
+
+	model.Blur()
+
+	if blurred := model.tableStyles().Selected; blurred.GetBackground() != lipgloss.NewStyle().GetBackground() {
+		t.Errorf("blurred cursor background = %v, want no highlight", blurred.GetBackground())
 	}
 }

@@ -3,6 +3,7 @@ package filesystem
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/drekunov/gc/internal/app"
 )
@@ -10,7 +11,6 @@ import (
 const (
 	connectorName = "FileSystem"
 
-	attrPath  = "path"
 	attrName  = "Name"
 	attrIsDir = "IsDir"
 	attrType  = "Type"
@@ -48,19 +48,13 @@ func (f *FileSystem) ReadDir(path string) ([]app.AttributeList, error) {
 	attributeList := make([]app.AttributeList, 0, len(entries)+1)
 
 	attributeList = append(attributeList, app.AttributeList{
-		{AttrName: attrPath, AttrValue: attrPath},
 		{AttrName: attrName, AttrValue: attrName},
 		{AttrName: attrIsDir, AttrValue: attrIsDir},
 		{AttrName: attrType, AttrValue: attrType},
 	})
 
 	for _, entry := range entries {
-		attrs := make(app.AttributeList, 0, 4)
-
-		attrs = append(attrs, app.Attribute{
-			AttrName:  attrPath,
-			AttrValue: path,
-		})
+		attrs := make(app.AttributeList, 0, 3)
 
 		attrs = append(attrs, app.Attribute{
 			AttrName:  attrName,
@@ -69,7 +63,7 @@ func (f *FileSystem) ReadDir(path string) ([]app.AttributeList, error) {
 
 		attrs = append(attrs, app.Attribute{
 			AttrName:  attrIsDir,
-			AttrValue: entry.IsDir(),
+			AttrValue: isDirEntry(path, entry),
 		})
 
 		attrs = append(attrs, app.Attribute{
@@ -81,4 +75,24 @@ func (f *FileSystem) ReadDir(path string) ([]app.AttributeList, error) {
 	}
 
 	return attributeList, nil
+}
+
+// isDirEntry reports whether the entry is a directory, following a symbolic
+// link to its target. A link that does not resolve to a directory, or whose
+// target cannot be stat'd, is not a directory.
+func isDirEntry(dir string, entry os.DirEntry) bool {
+	if entry.IsDir() {
+		return true
+	}
+
+	if entry.Type()&os.ModeSymlink == 0 {
+		return false
+	}
+
+	info, err := os.Stat(filepath.Join(dir, entry.Name()))
+	if err != nil {
+		return false
+	}
+
+	return info.IsDir()
 }

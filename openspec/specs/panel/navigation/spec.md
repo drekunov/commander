@@ -28,23 +28,43 @@ Keyboard navigation SHALL affect only the panel that currently holds focus. Whil
 - **WHEN** a modal dialog holds focus
 - **THEN** Enter and arrow keys operate on the dialog and do not move or reload the panel beneath it
 
-### Requirement: Arrow keys jump and step through the list
-Pressing the left arrow on the focused panel SHALL move the cursor to the first entry of the list. Pressing the right arrow SHALL move the cursor one entry down, stopping at the last entry. Up and down arrows SHALL continue stepping one row at a time.
+### Requirement: Arrow keys jump to the list edges and step through the list
+Pressing the left arrow on the focused panel SHALL move the cursor to the first entry of the list. Pressing the right arrow SHALL move the cursor to the last entry of the list. Up and down arrows SHALL continue stepping one row at a time. The cursor SHALL remain clamped at the first and last entries.
 
 #### Scenario: Left arrow jumps to the top
 - **WHEN** the cursor is on a middle entry and the user presses the left arrow
 - **THEN** the cursor moves to the first entry of the list
 
-#### Scenario: Right arrow steps down one entry
-- **WHEN** the user presses the right arrow
-- **THEN** the cursor moves to the next entry, unless the cursor is already on the last entry, in which case it stays there
+#### Scenario: Right arrow jumps to the bottom
+- **WHEN** the cursor is on an entry above the last one and the user presses the right arrow
+- **THEN** the cursor moves to the last entry of the list
+
+#### Scenario: Right arrow on the last entry stays put
+- **WHEN** the cursor is already on the last entry and the user presses the right arrow
+- **THEN** the cursor stays on the last entry
+
+#### Scenario: Up and down arrows still step one row
+- **WHEN** the user presses the down arrow on a non-last entry or the up arrow on a non-first entry
+- **THEN** the cursor moves exactly one row in that direction
 
 ### Requirement: Enter descends into the selected directory
-Pressing Enter while a directory entry is selected SHALL make that directory the focused panel's current directory and reload the panel with its listing, placing the cursor on the first row. Pressing Enter on a regular file SHALL do nothing and SHALL NOT change the listing. Opening an empty directory SHALL show only the ".." row and SHALL NOT report an error.
+Pressing Enter while a directory entry is selected SHALL make that directory the focused panel's current directory and reload the panel with its listing, placing the cursor on the first row. A symbolic link whose target is a directory SHALL count as a directory entry. Pressing Enter on a regular file, or on a symbolic link that does not resolve to a directory, SHALL do nothing and SHALL NOT change the listing. Opening an empty directory SHALL show only the ".." row and SHALL NOT report an error.
 
 #### Scenario: Enter descends into a directory
 - **WHEN** the user presses Enter on a selected directory entry
 - **THEN** the focused panel shows that directory's listing and the cursor is on its first row
+
+#### Scenario: Enter descends into a symlinked directory
+- **WHEN** the user presses Enter on a symbolic link whose target is a directory
+- **THEN** the focused panel shows the target directory's listing and the cursor is on its first row
+
+#### Scenario: Enter on a symlink to a file does nothing
+- **WHEN** the user presses Enter on a symbolic link whose target is a regular file
+- **THEN** the panel's directory and listing are unchanged and no error is reported
+
+#### Scenario: Enter on a broken symlink does nothing
+- **WHEN** the user presses Enter on a symbolic link whose target does not exist
+- **THEN** the panel's directory and listing are unchanged and no error is reported
 
 #### Scenario: Enter on a file does nothing
 - **WHEN** the user presses Enter on a regular file
@@ -94,3 +114,48 @@ When the focused panel's current directory is not the filesystem root, the panel
 #### Scenario: Empty directory keeps its parent entry
 - **WHEN** a panel shows an empty non-root directory
 - **THEN** its listing shows the ".." row and no file entries
+
+### Requirement: Ascending restores the cursor to the directory just left
+When the focused panel ascends to a parent directory — whether by Backspace or by Enter on the ".." row — it SHALL place the cursor on the listing entry for the directory it just left, and SHALL scroll the listing so that entry is visible. Each level of ascent SHALL restore the cursor for its own directory, so ascending several levels in succession returns to each directory in turn. When the parent listing has no entry for the directory just left, the panel SHALL place the cursor on the first row.
+
+#### Scenario: Backspace restores the cursor
+- **WHEN** the panel is inside /a/b and the user presses Backspace
+- **THEN** the panel shows /a and the cursor is on the entry for b
+
+#### Scenario: Enter on the parent row restores the cursor
+- **WHEN** the panel is inside /a/b and the user presses Enter on the ".." row
+- **THEN** the panel shows /a and the cursor is on the entry for b
+
+#### Scenario: Each level remembers its own child
+- **WHEN** the user descends from /a into b, then into c, and then ascends one level at a time
+- **THEN** the cursor is on c in /a/b and then on b in /a
+
+#### Scenario: Missing entry falls back to the first row
+- **WHEN** the panel ascends to a parent listing that has no entry for the directory just left
+- **THEN** the cursor is on the first row of that listing
+
+#### Scenario: Descending starts at the first row
+- **WHEN** the user enters a directory
+- **THEN** the cursor is on the first row of that directory's listing
+
+#### Scenario: Restored entry is scrolled into view
+- **WHEN** the restored directory lies outside the visible rows of a parent listing that is taller than the panel
+- **THEN** the listing scrolls so the restored entry is visible and highlighted
+
+### Requirement: Only the focused panel shows the selection cursor
+The selection cursor SHALL be rendered only on the panel that currently holds focus; the other panel SHALL NOT render a cursor. When window focus changes, cursor visibility SHALL follow the focus.
+
+#### Scenario: Cursor follows window focus
+- **WHEN** the left panel holds focus
+- **THEN** only the left panel renders its selection cursor and the right panel does not
+
+#### Scenario: Focus change moves the cursor
+- **WHEN** the user changes focus from one panel to the other
+- **THEN** the cursor appears only on the newly focused panel
+
+### Requirement: Navigation is reliable under rapid input
+Repeated navigation requests (Enter on a directory, Enter on the parent row, or Backspace) SHALL be applied so the focused panel ultimately displays the directory the user most recently requested; no valid request SHALL be dropped merely because the navigation queue is busy.
+
+#### Scenario: Rapid navigation honors the latest request
+- **WHEN** the user issues several navigation requests in quick succession
+- **THEN** the focused panel ends on the directory of the last request

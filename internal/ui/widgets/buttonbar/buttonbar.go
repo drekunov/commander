@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/drekunov/gc/internal/config"
 )
 
@@ -27,7 +28,14 @@ const (
 	ActionQuit
 )
 
-const buttonCount = 10
+const (
+	buttonCount = 10
+
+	// naturalButtonWidth is a button's width when the terminal is wide enough:
+	// a two-cell function-key number field plus a six-cell name field.
+	naturalButtonWidth = 8
+	numberFieldWidth   = 2
+)
 
 // actionDef describes a single bar button: its action identity and the label
 // it is rendered under.
@@ -158,23 +166,45 @@ func (m *Model) View() string {
 		return ""
 	}
 
+	buttonWidth := m.buttonWidth()
+	numberWidth := min(numberFieldWidth, buttonWidth)
+	nameWidth := buttonWidth - numberWidth
+
 	var row strings.Builder
 
 	for idx, def := range actions {
-		segWidth := m.segmentWidth(idx)
+		number := strings.TrimSuffix(def.label, def.name)
+		row.WriteString(renderField(m.numberStyle(), number, numberWidth, true))
+		row.WriteString(renderField(m.styleFor(idx, def.action), def.name, nameWidth, false))
 
-		text := def.label
-		if len(text) > segWidth {
-			text = text[:segWidth]
+		if idx < buttonCount-1 {
+			if gap := m.gapWidth(idx); gap > 0 {
+				row.WriteString(m.barBackground().Render(strings.Repeat(" ", gap)))
+			}
 		}
-
-		text += strings.Repeat(" ", segWidth-len(text))
-
-		style := m.styleFor(idx, def.action)
-		row.WriteString(style.Render(text))
 	}
 
 	return row.String()
+}
+
+// renderField renders text padded to width cells with style, right-aligning it
+// when alignRight is set and truncating it when it does not fit.
+func renderField(style lipgloss.Style, text string, width int, alignRight bool) string {
+	if width <= 0 {
+		return ""
+	}
+
+	if lipgloss.Width(text) > width {
+		text = ansi.Truncate(text, width, "")
+	}
+
+	pad := width - lipgloss.Width(text)
+
+	if alignRight {
+		return style.Render(strings.Repeat(" ", pad) + text)
+	}
+
+	return style.Render(text + strings.Repeat(" ", pad))
 }
 
 // SetWidth sets the bar's rendered width (the screen width).
@@ -232,18 +262,35 @@ func (m *Model) activate(action Action) tea.Cmd {
 	return action.Cmd()
 }
 
-// styleFor picks the segment style: the pressed or active button's foreground
-// and text decoration drawn on the bar strip's background, and the strip style
-// itself for the remaining buttons. Using the strip as the base keeps the
-// full-width background themed and the labels readable on it.
+// barBackground returns the bar's background base: the injected menu-background
+// style, falling back to the button-bar style for any attribute it leaves
+// unset. It is the base for the padding between labels and for the number,
+// name, and active/pressed styles, so the background applies in every state.
+func (m *Model) barBackground() lipgloss.Style {
+	return m.styles.MenuBackgroundStyle.Inherit(m.styles.ButtonBarStyle)
+}
+
+// numberStyle returns the style for a button's numeric prefix. It is drawn from
+// the injected menu-number style on the bar background and falls back to that
+// base for any attribute the menu-number style leaves unset. The number keeps
+// this style on focused and pressed buttons.
+func (m *Model) numberStyle() lipgloss.Style {
+	return m.styles.MenuNumberStyle.Inherit(m.barBackground())
+}
+
+// styleFor picks the style for a button's name text. The pressed and focused
+// buttons draw the pressed/active foreground and decoration on the bar strip's
+// background; the remaining buttons draw the injected menu-label style on the
+// strip, so their labels can be themed to match the cursor. The menu-label
+// style falls back to the strip style for any attribute it leaves unset.
 func (m *Model) styleFor(idx int, action Action) lipgloss.Style {
 	switch {
 	case action == m.pressed:
-		return overlay(m.styles.ButtonBarStyle, m.styles.PressedButtonStyle)
+		return overlay(m.barBackground(), m.styles.PressedButtonStyle)
 	case m.focused && idx == m.focusedIdx:
-		return overlay(m.styles.ButtonBarStyle, m.styles.ActiveButtonStyle)
+		return overlay(m.barBackground(), m.styles.ActiveButtonStyle)
 	default:
-		return m.styles.ButtonBarStyle
+		return m.styles.MenuLabelStyle.Inherit(m.barBackground())
 	}
 }
 
@@ -259,27 +306,53 @@ func overlay(bar, button lipgloss.Style) lipgloss.Style {
 	return style
 }
 
-// segmentWidth returns the width in cells of the idx-th button segment.
-// The screen width is split into ten equal segments; any remainder is spread
-// over the leftmost segments.
-func (m *Model) segmentWidth(idx int) int {
-	base := m.width / buttonCount
-	if idx < m.width%buttonCount {
+// buttonWidth returns the width in cells of every button: the natural width
+// when the terminal is wide enough, otherwise the widest equal width that fits.
+func (m *Model) buttonWidth() int {
+	width := m.width / buttonCount
+	if width > naturalButtonWidth {
+		return naturalButtonWidth
+	}
+
+	return width
+}
+
+// gapWidth returns the width in cells of the gap after the idx-th button. The
+// columns left over after the ten buttons are split equally over the gaps
+// between adjacent buttons; any remainder is spread over the leftmost gaps.
+func (m *Model) gapWidth(idx int) int {
+	gaps := buttonCount - 1
+	if gaps <= 0 {
+		return 0
+	}
+
+	leftover := m.width - buttonCount*m.buttonWidth()
+	if leftover < 0 {
+		return 0
+	}
+
+	base := leftover / gaps
+	if idx < leftover%gaps {
 		return base + 1
 	}
 
 	return base
 }
 
-// actionIndexAtColumn maps a screen column to the button segment index.
+// actionIndexAtColumn maps a screen column to the button whose span (its cells
+// plus the following gap) contains the column.
 func (m *Model) actionIndexAtColumn(col int) int {
+	buttonWidth := m.buttonWidth()
 	start := 0
 
-	for i := range actions {
-		start += m.segmentWidth(i)
+	for idx := range actions {
+		start += buttonWidth
+		if idx < buttonCount-1 {
+			start += m.gapWidth(idx)
+		}
 
 		if col < start {
-			return i
+			return idx
 		}
 	}
 
