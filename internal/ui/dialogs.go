@@ -22,7 +22,7 @@ func (m *Model) Info(ctx context.Context, title, footer, message string) {
 	about.SetVisible(true)
 
 	id := m.addDialogWindow(about, title)
-	defer m.main.WM().Remove(id)
+	defer m.closeDialogWindow(id)
 
 	m.sendMsg(tea.ResumeMsg{})
 
@@ -48,7 +48,7 @@ func (m *Model) runInput(ctx context.Context, title, footer, message string, ech
 	input.SetVisible(true)
 
 	id := m.addDialogWindow(input, title)
-	defer m.main.WM().Remove(id)
+	defer m.closeDialogWindow(id)
 
 	m.sendMsg(tea.ResumeMsg{})
 
@@ -68,7 +68,7 @@ func (m *Model) Select(ctx context.Context, title, message string, options []str
 	sel.SetVisible(true)
 
 	id := m.addDialogWindow(sel, title)
-	defer m.main.WM().Remove(id)
+	defer m.closeDialogWindow(id)
 
 	m.sendMsg(tea.ResumeMsg{})
 
@@ -92,7 +92,7 @@ func (m *Model) SelectMultiple(ctx context.Context, title, message string, optio
 	sel.SetVisible(true)
 
 	id := m.addDialogWindow(sel, title)
-	defer m.main.WM().Remove(id)
+	defer m.closeDialogWindow(id)
 
 	m.sendMsg(tea.ResumeMsg{})
 
@@ -115,7 +115,7 @@ func (m *Model) Confirm(ctx context.Context, title, message string) bool {
 	confirm.SetVisible(true)
 
 	id := m.addDialogWindow(confirm, title)
-	defer m.main.WM().Remove(id)
+	defer m.closeDialogWindow(id)
 
 	m.sendMsg(tea.ResumeMsg{})
 
@@ -171,4 +171,13 @@ func (m *Model) addDialogWindow(content tea.Model, title string) int {
 	posY := (canvasH - winH) / 2
 
 	return wmgr.Add(content, title, posX, posY, winW, winH)
+}
+
+// closeDialogWindow removes a dialog window and wakes the event loop so the
+// mainform re-syncs panel focus. Removing the window re-focuses the panel
+// beneath it, but that happens off the event loop, so a message is needed to
+// run the sync and restore the panel's cursor.
+func (m *Model) closeDialogWindow(id int) {
+	m.main.WM().Remove(id)
+	m.sendMsg(tea.ResumeMsg{})
 }

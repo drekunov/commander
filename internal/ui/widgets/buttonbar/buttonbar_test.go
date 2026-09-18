@@ -544,3 +544,23 @@ func TestFocusedAndPressedKeepMenuBackgroundBase(t *testing.T) {
 		t.Errorf("pressed foreground = %v, want pressed %v", pressedStyle.GetForeground(), pressed.GetForeground())
 	}
 }
+
+func TestClearPressedRestoresNormalStyle(t *testing.T) {
+	t.Parallel()
+
+	menuLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#00AAAA"))
+	pressed := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00"))
+
+	model := New(config.Styles{MenuLabelStyle: menuLabel, PressedButtonStyle: pressed})
+	model.pressed = actions[1].action
+
+	if got := model.styleFor(1, actions[1].action); got.GetForeground() != pressed.GetForeground() {
+		t.Fatalf("pressed foreground = %v, want pressed %v", got.GetForeground(), pressed.GetForeground())
+	}
+
+	model.ClearPressed()
+
+	if got := model.styleFor(1, actions[1].action); got.GetForeground() != menuLabel.GetForeground() {
+		t.Errorf("after ClearPressed foreground = %v, want menu-label %v", got.GetForeground(), menuLabel.GetForeground())
+	}
+}

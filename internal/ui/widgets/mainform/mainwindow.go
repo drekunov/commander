@@ -122,6 +122,12 @@ func (m *Model) Panel() *panel.Model {
 	return p
 }
 
+// Panels returns the left and right panels in order. A panel may be nil while
+// its window is being rebuilt.
+func (m *Model) Panels() []*panel.Model {
+	return []*panel.Model{m.panelFromWindow(m.leftPanelID), m.panelFromWindow(m.rightPanelID)}
+}
+
 // FocusedPanel returns the panel window that currently holds focus, or nil when
 // no panel is focused.
 func (m *Model) FocusedPanel() *panel.Model {
@@ -141,9 +147,9 @@ func (m *Model) FocusedPanel() *panel.Model {
 func (m *Model) Width() int  { return m.width }
 func (m *Model) Height() int { return m.height }
 
-// dialogOpen reports whether a dialog window (not a panel) currently holds
+// DialogOpen reports whether a dialog window (not a panel) currently holds
 // focus.
-func (m *Model) dialogOpen() bool {
+func (m *Model) DialogOpen() bool {
 	id := m.wm.FocusedWindowID()
 
 	return id >= 0 && id != m.leftPanelID && id != m.rightPanelID
@@ -158,7 +164,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return tea.Quit, true
 	}
 
-	if m.dialogOpen() {
+	if m.DialogOpen() {
 		if _, ok := buttonbar.ActionForKey(msg.Type); ok {
 			return nil, true
 		}
@@ -199,7 +205,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Cmd, bool) {
 		return nil, false
 	}
 
-	if m.dialogOpen() {
+	if m.DialogOpen() {
 		// A modal dialog owns the pointer: clicks outside it are ignored.
 		return nil, true
 	}

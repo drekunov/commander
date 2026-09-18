@@ -109,6 +109,11 @@ func (m *Model) SetPanelID(id app.PanelID) {
 	m.id = id
 }
 
+// ID returns the panel's identity.
+func (m *Model) ID() app.PanelID {
+	return m.id
+}
+
 func (m *Model) Dir() string {
 	return m.dir
 }
@@ -119,6 +124,12 @@ func (m *Model) Focus() {
 
 func (m *Model) Blur() {
 	m.tableView.Blur()
+}
+
+// CursorVisible reports whether the panel currently renders its selection
+// cursor, which is true only while the panel's table holds focus.
+func (m *Model) CursorVisible() bool {
+	return m.tableView.Focused()
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -226,6 +237,13 @@ func (m *Model) SortBy(title string) {
 	}
 
 	m.applySort()
+}
+
+// PreserveSelection marks the currently selected entry so the next listing
+// delivered for the same directory restores it instead of falling back to the
+// first row. A refresh uses it to keep the user's place.
+func (m *Model) PreserveSelection() {
+	m.pendingSelect = m.selectedEntryName()
 }
 
 // positionCursor places the table cursor on display row idx and scrolls the

@@ -113,6 +113,64 @@ func TestSetDataNoRows(t *testing.T) {
 	}
 }
 
+func TestSetDataSameDirPreservesSelection(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.Focus()
+	model.SetData("/a", testListing("d:b", "f1", "f2"))
+
+	// Display rows are [.., b, f1, f2]; select f2.
+	model.tableView.MoveDown(3)
+
+	selected := model.selectedEntryName()
+	if selected != "f2" {
+		t.Fatalf("selected entry = %q, want f2", selected)
+	}
+
+	model.PreserveSelection()
+	model.SetData("/a", testListing("d:b", "f1", "f2"))
+
+	if got := model.selectedEntryName(); got != selected {
+		t.Errorf("selection after refresh = %q, want %q", got, selected)
+	}
+}
+
+func TestSetDataSameDirMissingEntryFallsBackToFirstRow(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.Focus()
+	model.SetData("/a", testListing("d:b", "f1", "f2"))
+
+	model.tableView.MoveDown(3) // select f2
+
+	model.PreserveSelection()
+
+	// f2 is gone; the cursor returns to the first display row.
+	model.SetData("/a", testListing("d:b", "f1"))
+
+	if got := model.tableView.Cursor(); got != 0 {
+		t.Errorf("cursor after missing selection = %d, want 0", got)
+	}
+}
+
+func TestSetDataDifferentDirResetsSelection(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.Focus()
+	model.SetData("/a", testListing("d:b", "f1", "f2"))
+
+	model.tableView.MoveDown(3) // select f2
+
+	model.SetData("/b", testListing("d:c", "f3", "f4"))
+
+	if got := model.tableView.Cursor(); got != 0 {
+		t.Errorf("cursor after navigating to a different dir = %d, want 0", got)
+	}
+}
+
 func TestEnterOnDirectoryEmitsNavigateMsg(t *testing.T) {
 	t.Parallel()
 
@@ -742,7 +800,7 @@ func hiddenHeader() app.AttributeList {
 func hiddenEntry() app.AttributeList {
 	return app.AttributeList{
 		{AttrName: attrName, AttrValue: subName},
-		{AttrName: attrSize, AttrValue: "<DIR>"},
+		{AttrName: attrSize, AttrValue: parentSizeValue},
 		{AttrName: attrIsDir, AttrValue: true, Hidden: true},
 	}
 }
@@ -778,7 +836,7 @@ func assertHiddenRows(t *testing.T, model *Model) {
 		t.Fatalf("entry row has %d cells, want 2 (IsDir hidden)", len(entryRow))
 	}
 
-	if entryRow[0] != subName || entryRow[1] != "<DIR>" {
+	if entryRow[0] != subName || entryRow[1] != parentSizeValue {
 		t.Errorf("entry row = %v, want [%s <DIR>]", entryRow, subName)
 	}
 }
@@ -1102,7 +1160,7 @@ func TestSchemaChangeResetsSortAndRows(t *testing.T) {
 
 	wide := app.AttributeList{
 		{AttrName: attrName, AttrValue: "sub"},
-		{AttrName: attrSize, AttrValue: "<DIR>"},
+		{AttrName: attrSize, AttrValue: parentSizeValue},
 		{AttrName: attrDate, AttrValue: "2026-09-18"},
 		{AttrName: attrTime, AttrValue: "12:00:00"},
 		{AttrName: attrIsDir, AttrValue: true, Hidden: true},

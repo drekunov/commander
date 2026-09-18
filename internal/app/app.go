@@ -18,10 +18,11 @@ type App struct {
 	ui        UI
 	connector Connector
 
-	// navMu guards pending, the single latest navigation request. A newer
-	// request replaces an older one instead of being dropped.
+	// navMu guards pending, the latest batch of navigation requests. Ordinary
+	// navigation replaces the batch with one request; a refresh stores both
+	// panels' requests so neither is dropped.
 	navMu   sync.Mutex
-	pending *NavRequest
+	pending []NavRequest
 	navSig  chan struct{}
 }
 
@@ -36,14 +37,13 @@ func New(ui UI, conn Connector) *App {
 // Navigate stores the latest navigation request and wakes the run loop. It is
 // non-blocking and never discards the newest request.
 func (a *App) Navigate(panel PanelID, dir string) {
-	a.navMu.Lock()
-	a.pending = &NavRequest{Panel: panel, Dir: dir}
-	a.navMu.Unlock()
+	a.setPending([]NavRequest{{Panel: panel, Dir: dir}})
+}
 
-	select {
-	case a.navSig <- struct{}{}:
-	default:
-	}
+// Refresh stores a batch of navigation requests and wakes the run loop, so a
+// caller can re-read several panels without one request replacing another.
+func (a *App) Refresh(requests []NavRequest) {
+	a.setPending(requests)
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -59,27 +59,42 @@ func (a *App) Run(ctx context.Context) error {
 			return nil
 
 		case <-a.navSig:
-			if nav, ok := a.takePending(); ok {
-				a.handleNav(nav)
+			if requests, ok := a.takePending(); ok {
+				for _, nav := range requests {
+					a.handleNav(nav)
+				}
 			}
 		}
 	}
 }
 
-// takePending returns and clears the latest request, reporting whether one was
+// takePending returns and clears the latest batch, reporting whether one was
 // waiting.
-func (a *App) takePending() (NavRequest, bool) {
+func (a *App) takePending() ([]NavRequest, bool) {
 	a.navMu.Lock()
 	defer a.navMu.Unlock()
 
-	if a.pending == nil {
-		return NavRequest{}, false
+	if len(a.pending) == 0 {
+		return nil, false
 	}
 
-	nav := *a.pending
+	requests := a.pending
 	a.pending = nil
 
-	return nav, true
+	return requests, true
+}
+
+// setPending replaces the pending batch and wakes the run loop. It is
+// non-blocking and never discards the batch it was given.
+func (a *App) setPending(requests []NavRequest) {
+	a.navMu.Lock()
+	a.pending = requests
+	a.navMu.Unlock()
+
+	select {
+	case a.navSig <- struct{}{}:
+	default:
+	}
 }
 
 // loadPanel reads dir and delivers it to the panel. A read failure is shown

@@ -59,11 +59,19 @@ The system SHALL accept a mouse click on a rendered button as an activation of t
 - **THEN** left and right arrow keys move the focus between adjacent buttons and pressing Enter activates the focused button
 
 ### Requirement: Activated buttons give visible feedback
-When a button is activated, the system SHALL briefly render it in its pressed state and then render the consequence of the action, so the user sees which button was triggered.
+When a button is activated, the system SHALL render it in its pressed state at the moment of activation and SHALL clear that pressed state when the activation is dispatched, so the button returns to its normal style before or as the consequence of the action appears. A button whose action opens a dialog SHALL NOT remain pressed while the dialog is open.
 
 #### Scenario: Pressed state shown on activation
 - **WHEN** a button is activated by key or mouse
 - **THEN** the button is shown in its pressed styling at the moment of activation
+
+#### Scenario: Pressed state ends when the action is dispatched
+- **WHEN** a button is activated and its action has been dispatched
+- **THEN** the button is rendered in its normal style and is no longer shown as pressed
+
+#### Scenario: Button does not stay pressed while its dialog is open
+- **WHEN** a button such as Menu opens a dialog
+- **THEN** the button is rendered unpressed for as long as the dialog remains open
 
 ### Requirement: Non-quit actions are mocks that report their name
 Activating any button from 1Help through 9PullDn, except the Menu button, SHALL run a placeholder mock action that reports which action was requested without performing a real file operation, and SHALL NOT modify any file, directory, panel data, or the application state. The Menu button SHALL instead open the panel sort window.

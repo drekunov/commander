@@ -146,3 +146,74 @@ func waitForSelectWindow(model *Model) *wm.Window {
 
 	return nil
 }
+
+func TestClosingSortWindowRestoresPanelCursor(t *testing.T) {
+	t.Parallel()
+
+	model := sortModel(t)
+
+	sent := make(chan tea.Msg, 4)
+	model.sendMsg = func(msg tea.Msg) { sent <- msg }
+
+	cmd := model.sortWindowCmd()
+	if cmd == nil {
+		t.Fatal("sortWindowCmd returned nil")
+	}
+
+	result := make(chan tea.Msg, 1)
+
+	go func() {
+		result <- cmd()
+	}()
+
+	win := waitForSelectWindow(model)
+	if win == nil {
+		t.Fatal("the sort window did not open")
+	}
+
+	// The event loop handles the open signal, which blurs the panels while the
+	// dialog holds focus.
+	deliverResume(t, model, sent)
+
+	sel, ok := win.Content.(*dialogs.Select)
+	if !ok {
+		t.Fatalf("window content = %T, want *dialogs.Select", win.Content)
+	}
+
+	// Choose a column to close the sort window.
+	_, _ = sel.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	var msg tea.Msg
+
+	select {
+	case msg = <-result:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the sort window command did not return")
+	}
+
+	// The close signal is what restores the panel focus and its cursor.
+	deliverResume(t, model, sent)
+
+	model.Update(msg)
+
+	if p := model.main.FocusedPanel(); p == nil || !p.CursorVisible() {
+		t.Error("the focused panel does not show its cursor after the sort window closed")
+	}
+}
+
+// deliverResume consumes one event-loop message the model sent, asserts it is
+// the focus-resync signal, and delivers it so the mainform re-syncs focus.
+func deliverResume(t *testing.T, model *Model, sent <-chan tea.Msg) {
+	t.Helper()
+
+	select {
+	case msg := <-sent:
+		if _, ok := msg.(tea.ResumeMsg); !ok {
+			t.Fatalf("sent message = %T, want tea.ResumeMsg", msg)
+		}
+
+		model.Update(msg)
+	case <-time.After(2 * time.Second):
+		t.Fatal("the model sent no resync message")
+	}
+}

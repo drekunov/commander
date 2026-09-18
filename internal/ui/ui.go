@@ -35,6 +35,9 @@ type Model struct {
 	// navigator resolves panel navigation requests (see SetNavigator).
 	navigator func(app.PanelID, string)
 
+	// refresher resolves a batch refresh of both panels (see SetRefresher).
+	refresher func([]app.NavRequest)
+
 	// quit is closed when the tea program exits so goroutines that show
 	// dialogs never outlive the application.
 	quit chan struct{}
@@ -77,15 +80,13 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) { //nolint: gocritic
 	case tea.KeyMsg:
-		if msg.Type == tea.KeyF10 {
-			return m, tea.Quit
-		}
-
-		if msg.Type == dumpScreenKey {
-			return m, m.dumpCmd(m.View())
+		if cmd, handled := m.handleGlobalKey(msg); handled {
+			return m, cmd
 		}
 
 	case buttonbar.ActivateMsg:
+		m.main.Bar().ClearPressed()
+
 		return m, m.handleBarActivation(msg.Action)
 
 	case sortColumnMsg:
@@ -112,6 +113,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) View() string {
 	return m.main.View()
+}
+
+// handleGlobalKey processes keys the ui owns before windows see them: F10
+// quits, F12 dumps the screen, and Ctrl+R refreshes both panels unless a modal
+// dialog is open. It reports whether the key was handled.
+func (m *Model) handleGlobalKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.Type {
+	case tea.KeyF10:
+		return tea.Quit, true
+	case dumpScreenKey:
+		return m.dumpCmd(m.View()), true
+	case tea.KeyCtrlR:
+		if !m.main.DialogOpen() {
+			m.refreshPanels()
+		}
+
+		return nil, true
+	}
+
+	return nil, false
 }
 
 // dumpCmd returns a command that writes the captured frame to a dump file,
@@ -217,7 +238,7 @@ func (m *Model) waitMock(info *dialogs.Info) {
 	m.mockWinID = 0
 	m.mockMu.Unlock()
 
-	m.main.WM().Remove(id)
+	m.closeDialogWindow(id)
 }
 
 // handleNavigate forwards a panel navigation request to the app's directory

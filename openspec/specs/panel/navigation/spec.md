@@ -143,7 +143,7 @@ When the focused panel ascends to a parent directory — whether by Backspace or
 - **THEN** the listing scrolls so the restored entry is visible and highlighted
 
 ### Requirement: Only the focused panel shows the selection cursor
-The selection cursor SHALL be rendered only on the panel that currently holds focus; the other panel SHALL NOT render a cursor. When window focus changes, cursor visibility SHALL follow the focus.
+The selection cursor SHALL be rendered only on the panel that currently holds focus; the other panel SHALL NOT render a cursor. Cursor visibility SHALL follow window focus, including when focus returns to a panel after a dialog window closes, not only while the application is processing an input message.
 
 #### Scenario: Cursor follows window focus
 - **WHEN** the left panel holds focus
@@ -152,6 +152,10 @@ The selection cursor SHALL be rendered only on the panel that currently holds fo
 #### Scenario: Focus change moves the cursor
 - **WHEN** the user changes focus from one panel to the other
 - **THEN** the cursor appears only on the newly focused panel
+
+#### Scenario: Cursor returns after a dialog closes
+- **WHEN** a dialog window closes and focus returns to a panel
+- **THEN** that panel renders its selection cursor again without requiring further input
 
 ### Requirement: Navigation is reliable under rapid input
 Repeated navigation requests (Enter on a directory, Enter on the parent row, or Backspace) SHALL be applied so the focused panel ultimately displays the directory the user most recently requested; no valid request SHALL be dropped merely because the navigation queue is busy.
