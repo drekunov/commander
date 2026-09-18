@@ -54,27 +54,18 @@ func (m *Select) View() string {
 	lines := make([]string, 0, len(m.options))
 
 	for index, option := range m.options {
-		marker := "  "
+		line := option
 
 		if m.multi {
+			marker := "[ ]"
 			if m.selected[index] {
 				marker = "[x]"
-			} else {
-				marker = "[ ]"
 			}
+
+			line = marker + " " + option
 		}
 
-		cursor := " "
-
-		if index == m.cursor {
-			cursor = ">"
-		}
-
-		line := cursor + " " + marker + " " + option
-
-		if index == m.cursor {
-			line = m.styles.CursorStyle.Render(line)
-		}
+		line = m.optionStyle(index == m.cursor).Render(line)
 
 		lines = append(lines, line)
 	}
@@ -82,7 +73,7 @@ func (m *Select) View() string {
 	body := strings.Join(lines, "\n")
 
 	if m.text != "" {
-		body = lipgloss.JoinVertical(lipgloss.Center, m.styles.TextStyle.Render(m.text), body)
+		body = lipgloss.JoinVertical(lipgloss.Center, m.textStyle().Render(m.text), body)
 	}
 
 	return m.render(body)

@@ -68,9 +68,9 @@ func (m *Input) View() string {
 		return ""
 	}
 
-	text := m.styles.TextStyle.Render(m.text)
+	text := m.textStyle().Render(m.text)
 
-	input := m.styles.InputStyle.
+	input := m.inputStyle().
 		Render(m.input.View())
 
 	okButton := m.okButton.View()

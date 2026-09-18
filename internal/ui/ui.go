@@ -189,7 +189,10 @@ func (m *Model) sortWindowCmd() tea.Cmd {
 
 // showMock reports a not-yet-implemented bar action. Only one mock dialog is
 // kept open: a later activation updates the existing dialog's text in place
-// instead of stacking another window and goroutine. Runs on the event loop.
+// instead of stacking another window and goroutine. It runs on the event loop,
+// so it must not send a message to the program (the message channel is
+// unbuffered and single-reader): the window is rendered by the normal
+// post-Update render.
 func (m *Model) showMock(action buttonbar.Action) {
 	text := action.Name() + " is not implemented yet"
 
@@ -199,8 +202,6 @@ func (m *Model) showMock(action buttonbar.Action) {
 		m.mockDialog.SetText(text)
 		m.mockMu.Unlock()
 
-		m.sendMsg(tea.ResumeMsg{})
-
 		return
 	}
 
@@ -209,10 +210,8 @@ func (m *Model) showMock(action buttonbar.Action) {
 	info.SetVisible(true)
 
 	m.mockDialog = info
-	m.mockWinID = m.addDialogWindow(info, "Mock")
+	m.mockWinID = m.addDialogWindow(info, "Unimplemented")
 	m.mockMu.Unlock()
-
-	m.sendMsg(tea.ResumeMsg{})
 
 	go m.waitMock(info)
 }

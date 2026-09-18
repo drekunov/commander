@@ -177,3 +177,126 @@ func TestLoadStylesMenuBackground(t *testing.T) {
 		t.Error("menu-background style is not bold")
 	}
 }
+
+// chromeCase describes the expected attributes of one theme class.
+type chromeCase struct {
+	name    string
+	style   lipgloss.Style
+	fg      lipgloss.TerminalColor
+	bg      lipgloss.TerminalColor
+	bold    bool
+	padding int
+}
+
+func assertChromeStyles(t *testing.T, cases []chromeCase) {
+	t.Helper()
+
+	for _, testCase := range cases {
+		if testCase.fg != nil && testCase.style.GetForeground() != testCase.fg {
+			t.Errorf("%s foreground = %v, want %v", testCase.name, testCase.style.GetForeground(), testCase.fg)
+		}
+
+		if testCase.bg != nil && testCase.style.GetBackground() != testCase.bg {
+			t.Errorf("%s background = %v, want %v", testCase.name, testCase.style.GetBackground(), testCase.bg)
+		}
+
+		if testCase.style.GetBold() != testCase.bold {
+			t.Errorf("%s bold = %v, want %v", testCase.name, testCase.style.GetBold(), testCase.bold)
+		}
+
+		if got := testCase.style.GetPaddingLeft(); got != testCase.padding {
+			t.Errorf("%s padding left = %d, want %d", testCase.name, got, testCase.padding)
+		}
+
+		if got := testCase.style.GetPaddingRight(); got != testCase.padding {
+			t.Errorf("%s padding right = %d, want %d", testCase.name, got, testCase.padding)
+		}
+	}
+}
+
+//nolint:paralleltest // t.Chdir mutates the process-global working directory
+func TestLoadStylesDialogChrome(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	styles, err := config.LoadStyles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertChromeStyles(t, []chromeCase{
+		{
+			name:    "dialog-cursor",
+			style:   styles.DialogCursorStyle,
+			fg:      lipgloss.Color("#000000"),
+			bg:      lipgloss.Color("#00AAAA"),
+			bold:    true,
+			padding: 1,
+		},
+		{
+			name:    "dialog-option",
+			style:   styles.DialogOptionStyle,
+			fg:      lipgloss.Color("#00AAAA"),
+			bg:      lipgloss.Color("#000080"),
+			padding: 1,
+		},
+	})
+}
+
+//nolint:paralleltest // t.Chdir mutates the process-global working directory
+func TestLoadStylesWindowChrome(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	styles, err := config.LoadStyles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertChromeStyles(t, []chromeCase{
+		{
+			name:  "window-title",
+			style: styles.WindowTitleStyle,
+			fg:    lipgloss.Color("#FFFFFF"),
+			bg:    lipgloss.Color("#000080"),
+			bold:  true,
+		},
+		{
+			name:  "window-title-unfocused",
+			style: styles.WindowTitleUnfocusedStyle,
+			fg:    lipgloss.Color("#00AAAA"),
+			bg:    lipgloss.Color("#000080"),
+		},
+		{
+			name:  "window-grip",
+			style: styles.WindowGripStyle,
+			fg:    lipgloss.Color("#00AAAA"),
+			bg:    lipgloss.Color("#000080"),
+		},
+	})
+}
+
+//nolint:paralleltest // t.Chdir mutates the process-global working directory
+func TestLoadStylesDialogAndWindowOverride(t *testing.T) {
+	dir := t.TempDir()
+
+	override := []byte(".dialog-cursor { background-color: #123456; }\n.window-grip { color: #ABCDEF; }")
+
+	err := os.WriteFile(filepath.Join(dir, "styles.css"), override, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Chdir(dir)
+
+	styles, err := config.LoadStyles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if styles.DialogCursorStyle.GetBackground() != lipgloss.Color("#123456") {
+		t.Errorf("dialog-cursor background = %v, want #123456", styles.DialogCursorStyle.GetBackground())
+	}
+
+	if styles.WindowGripStyle.GetForeground() != lipgloss.Color("#ABCDEF") {
+		t.Errorf("window-grip foreground = %v, want #ABCDEF", styles.WindowGripStyle.GetForeground())
+	}
+}

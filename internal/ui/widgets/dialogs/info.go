@@ -50,7 +50,7 @@ func (m *Info) View() string {
 		return ""
 	}
 
-	text := m.styles.TextStyle.Render(m.text)
+	text := m.textStyle().Render(m.text)
 
 	okButton := m.okButton.View()
 

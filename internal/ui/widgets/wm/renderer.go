@@ -118,18 +118,13 @@ func (r *renderer) buildTitleBar(win *Window, innerW int) string {
 
 	borderStyle := lipgloss.NewStyle().Foreground(borderFg).Background(bgColor)
 
+	// Focused and unfocused titles come from the theme, falling back to the
+	// frame border color and background when a class is unset.
 	var titleStyle lipgloss.Style
 	if win.Focused {
-		// Focused: bright white title, bold — matches NC active dialog style.
-		titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(bgColor).
-			Bold(true)
+		titleStyle = r.styles.WindowTitleStyle.Inherit(borderStyle)
 	} else {
-		// Unfocused: same cyan as the border, no bold.
-		titleStyle = lipgloss.NewStyle().
-			Foreground(borderFg).
-			Background(bgColor)
+		titleStyle = r.styles.WindowTitleUnfocusedStyle.Inherit(borderStyle)
 	}
 
 	leftPart := border.TopLeft + strings.Repeat(border.Top, left)
@@ -150,8 +145,9 @@ func (r *renderer) buildResizeGrip(innerW int) string {
 		gripRune +
 		border.BottomRight
 
-	return lipgloss.NewStyle().
+	frameStyle := lipgloss.NewStyle().
 		Foreground(r.styles.DialogBoxStyle.GetBorderBottomForeground()).
-		Background(bgColor).
-		Render(grip)
+		Background(bgColor)
+
+	return r.styles.WindowGripStyle.Inherit(frameStyle).Render(grip)
 }

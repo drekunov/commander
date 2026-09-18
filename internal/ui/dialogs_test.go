@@ -148,3 +148,54 @@ func TestRepeatedMockActivationReusesDialog(t *testing.T) {
 		t.Errorf("window count = %d, want 3 (two panels and one mock dialog)", got)
 	}
 }
+
+func TestMockDialogTitleIsUnimplemented(t *testing.T) {
+	t.Parallel()
+
+	model := &Model{
+		main:    mainform.New(config.Styles{}),
+		styles:  config.Styles{},
+		sendMsg: func(tea.Msg) {},
+		quit:    make(chan struct{}),
+	}
+
+	defer model.stop()
+
+	model.showMock(buttonbar.ActionView)
+
+	model.mockMu.Lock()
+	id := model.mockWinID
+	model.mockMu.Unlock()
+
+	win := model.main.WM().Get(id)
+	if win == nil {
+		t.Fatal("mock dialog window was not created")
+	}
+
+	if win.Title != "Unimplemented" {
+		t.Errorf("mock dialog title = %q, want Unimplemented", win.Title)
+	}
+}
+
+// showMock runs on the event loop; posting to the program from there would
+// deadlock on the program's unbuffered, single-reader message channel.
+func TestShowMockDoesNotPostToProgram(t *testing.T) {
+	t.Parallel()
+
+	posted := 0
+
+	model := &Model{
+		main:    mainform.New(config.Styles{}),
+		styles:  config.Styles{},
+		sendMsg: func(tea.Msg) { posted++ },
+		quit:    make(chan struct{}),
+	}
+
+	defer model.stop()
+
+	model.showMock(buttonbar.ActionView)
+
+	if posted != 0 {
+		t.Errorf("showMock posted %d message(s) from the event loop; want 0", posted)
+	}
+}
