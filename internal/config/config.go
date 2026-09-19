@@ -25,6 +25,12 @@ type Styles struct {
 	MenuLabelStyle            lipgloss.Style
 	MenuNumberStyle           lipgloss.Style
 	MenuBackgroundStyle       lipgloss.Style
+	TopBarStyle               lipgloss.Style
+	MenuCaptionStyle          lipgloss.Style
+	MenuCaptionActiveStyle    lipgloss.Style
+	MenuHotkeyStyle           lipgloss.Style
+	PulldownStyle             lipgloss.Style
+	PulldownCursorStyle       lipgloss.Style
 	WindowTitleStyle          lipgloss.Style
 	WindowTitleUnfocusedStyle lipgloss.Style
 	WindowGripStyle           lipgloss.Style
@@ -65,6 +71,12 @@ func LoadStyles() (Styles, error) {
 		MenuLabelStyle:            ApplyStyle(stylesheet[".menu-label"]),
 		MenuNumberStyle:           ApplyStyle(stylesheet[".menu-number"]),
 		MenuBackgroundStyle:       ApplyStyle(stylesheet[".menu-background"]),
+		TopBarStyle:               ApplyStyle(stylesheet[".menu-top-bar"]),
+		MenuCaptionStyle:          ApplyStyle(stylesheet[".menu-caption"]),
+		MenuCaptionActiveStyle:    ApplyStyle(stylesheet[".menu-caption-active"]),
+		MenuHotkeyStyle:           ApplyStyle(stylesheet[".menu-hotkey"]),
+		PulldownStyle:             ApplyStyle(stylesheet[".menu-pulldown"]),
+		PulldownCursorStyle:       ApplyStyle(stylesheet[".menu-pulldown-cursor"]),
 		WindowTitleStyle:          ApplyStyle(stylesheet[".window-title"]),
 		WindowTitleUnfocusedStyle: ApplyStyle(stylesheet[".window-title-unfocused"]),
 		WindowGripStyle:           ApplyStyle(stylesheet[".window-grip"]),

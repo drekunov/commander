@@ -87,6 +87,40 @@
     font-weight: bold;
 }
 
+.menu-top-bar {
+    color: #C0C0C0;
+    background-color: #000000;
+}
+
+.menu-caption {
+    color: #C0C0C0;
+    background-color: #000000;
+    padding: 0 1 0 1;
+}
+
+.menu-caption-active {
+    color: #000000;
+    background-color: #00AAAA;
+    padding: 0 1 0 1;
+}
+
+.menu-hotkey {
+    color: #FFFF00;
+    background-color: #000000;
+    font-weight: bold;
+}
+
+.menu-pulldown {
+    color: #C0C0C0;
+    background-color: #000080;
+}
+
+.menu-pulldown-cursor {
+    color: #000000;
+    background-color: #00AAAA;
+    font-weight: bold;
+}
+
 .window-title {
     color: #FFFFFF;
     background-color: #000080;

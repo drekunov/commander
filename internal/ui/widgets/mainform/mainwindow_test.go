@@ -1,15 +1,22 @@
 package mainform_test
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/drekunov/gc/internal/app"
 	"github.com/drekunov/gc/internal/config"
 	"github.com/drekunov/gc/internal/ui/widgets/buttonbar"
 	"github.com/drekunov/gc/internal/ui/widgets/mainform"
 	"github.com/drekunov/gc/internal/ui/widgets/panel"
+	"github.com/drekunov/gc/internal/ui/widgets/topmenu"
 )
+
+func pressAt(x, y int) tea.MouseMsg {
+	return tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonLeft, X: x, Y: y}
+}
 
 const (
 	attrName  = "Name"
@@ -162,6 +169,109 @@ func TestDialogIsModal(t *testing.T) {
 
 	if _, ok := cmd().(tea.QuitMsg); !ok {
 		t.Errorf("F10 resolved to %T, want tea.QuitMsg", cmd())
+	}
+}
+
+func TestViewHasTopRowAndReducedCanvas(t *testing.T) {
+	t.Parallel()
+
+	model := mainform.New(config.Styles{})
+	model = resizeMainform(model)
+
+	lines := strings.Split(model.View(), "\n")
+	if len(lines) != 30 {
+		t.Fatalf("view lines = %d, want 30", len(lines))
+	}
+
+	top := ansi.Strip(lines[0])
+
+	for _, caption := range []string{"Left", "Files", "Commands", "Options", "Right"} {
+		if !strings.Contains(top, caption) {
+			t.Errorf("top row %q missing caption %q", top, caption)
+		}
+	}
+
+	if got := model.WM().Height(); got != 28 {
+		t.Errorf("window-manager height = %d, want 28 (height minus top and bottom rows)", got)
+	}
+}
+
+func TestTopRowClickOpensMenu(t *testing.T) {
+	t.Parallel()
+
+	model := mainform.New(config.Styles{})
+	model = resizeMainform(model)
+
+	updated, cmd := model.Update(pressAt(2, 0))
+	if cmd != nil {
+		t.Errorf("top-row click produced command %v, want none", cmd())
+	}
+
+	if !updated.TopMenu().Active() {
+		t.Error("top-row caption click did not activate the top menu")
+	}
+
+	if !updated.TopMenu().Open() {
+		t.Error("top-row caption click did not open a pull-down")
+	}
+}
+
+func TestActiveTopMenuHandlesNavKeys(t *testing.T) {
+	t.Parallel()
+
+	model := mainform.New(config.Styles{})
+	model = resizeMainform(model)
+	model.TopMenu().Activate()
+
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if cmd != nil {
+		t.Errorf("Down while the top menu is active produced command %v, want none", cmd())
+	}
+
+	if !model.TopMenu().Open() {
+		t.Error("Down did not open the top menu pull-down")
+	}
+}
+
+func TestPulldownRowClickRoutesToTopMenu(t *testing.T) {
+	t.Parallel()
+
+	model := mainform.New(config.Styles{})
+	model = resizeMainform(model)
+	model.TopMenu().Activate()
+
+	_, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+
+	_, cmd := model.Update(pressAt(2, 2))
+	if cmd == nil {
+		t.Fatal("pull-down item click produced no command")
+	}
+
+	msg, ok := cmd().(topmenu.ActivateMsg)
+	if !ok {
+		t.Fatalf("cmd resolved to %T, want topmenu.ActivateMsg", cmd())
+	}
+
+	if msg.Label != "Brief" {
+		t.Errorf("pull-down click activated %q, want Brief", msg.Label)
+	}
+}
+
+func TestDialogBlocksTopMenuActivation(t *testing.T) {
+	t.Parallel()
+
+	model := mainform.New(config.Styles{})
+	model = resizeMainform(model)
+
+	model.WM().Add(dummyDialog{}, "Dialog", 10, 5, 20, 5)
+
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyF9})
+	if cmd != nil {
+		t.Errorf("F9 with a dialog open produced command %v, want none", cmd())
+	}
+
+	if model.TopMenu().Active() {
+		t.Error("F9 activated the top menu while a dialog was open")
 	}
 }
 

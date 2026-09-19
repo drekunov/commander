@@ -300,3 +300,83 @@ func TestLoadStylesDialogAndWindowOverride(t *testing.T) {
 		t.Errorf("window-grip foreground = %v, want #ABCDEF", styles.WindowGripStyle.GetForeground())
 	}
 }
+
+//nolint:paralleltest // t.Chdir mutates the process-global working directory
+func TestLoadStylesTopMenu(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	styles, err := config.LoadStyles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertChromeStyles(t, []chromeCase{
+		{
+			name:  "menu-top-bar",
+			style: styles.TopBarStyle,
+			fg:    lipgloss.Color("#C0C0C0"),
+			bg:    lipgloss.Color("#000000"),
+		},
+		{
+			name:    "menu-caption",
+			style:   styles.MenuCaptionStyle,
+			fg:      lipgloss.Color("#C0C0C0"),
+			bg:      lipgloss.Color("#000000"),
+			padding: 1,
+		},
+		{
+			name:    "menu-caption-active",
+			style:   styles.MenuCaptionActiveStyle,
+			fg:      lipgloss.Color("#000000"),
+			bg:      lipgloss.Color("#00AAAA"),
+			padding: 1,
+		},
+		{
+			name:  "menu-hotkey",
+			style: styles.MenuHotkeyStyle,
+			fg:    lipgloss.Color("#FFFF00"),
+			bg:    lipgloss.Color("#000000"),
+			bold:  true,
+		},
+		{
+			name:  "menu-pulldown",
+			style: styles.PulldownStyle,
+			fg:    lipgloss.Color("#C0C0C0"),
+			bg:    lipgloss.Color("#000080"),
+		},
+		{
+			name:  "menu-pulldown-cursor",
+			style: styles.PulldownCursorStyle,
+			fg:    lipgloss.Color("#000000"),
+			bg:    lipgloss.Color("#00AAAA"),
+			bold:  true,
+		},
+	})
+}
+
+//nolint:paralleltest // t.Chdir mutates the process-global working directory
+func TestLoadStylesTopMenuOverride(t *testing.T) {
+	dir := t.TempDir()
+
+	override := []byte(".menu-caption { color: #111111; }\n.menu-pulldown-cursor { background-color: #222222; }")
+
+	err := os.WriteFile(filepath.Join(dir, "styles.css"), override, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Chdir(dir)
+
+	styles, err := config.LoadStyles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if styles.MenuCaptionStyle.GetForeground() != lipgloss.Color("#111111") {
+		t.Errorf("menu-caption foreground = %v, want #111111", styles.MenuCaptionStyle.GetForeground())
+	}
+
+	if styles.PulldownCursorStyle.GetBackground() != lipgloss.Color("#222222") {
+		t.Errorf("menu-pulldown-cursor background = %v, want #222222", styles.PulldownCursorStyle.GetBackground())
+	}
+}

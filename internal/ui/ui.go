@@ -12,6 +12,7 @@ import (
 	"github.com/drekunov/gc/internal/ui/widgets/dialogs"
 	"github.com/drekunov/gc/internal/ui/widgets/mainform"
 	"github.com/drekunov/gc/internal/ui/widgets/panel"
+	"github.com/drekunov/gc/internal/ui/widgets/topmenu"
 )
 
 const (
@@ -89,6 +90,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, m.handleBarActivation(msg.Action)
 
+	case topmenu.ActivateMsg:
+		return m, m.handleTopMenuActivation(msg)
+
 	case sortColumnMsg:
 		if msg.column != "" {
 			if p := m.main.FocusedPanel(); p != nil {
@@ -155,9 +159,30 @@ func (m *Model) handleBarActivation(action buttonbar.Action) tea.Cmd {
 
 	case buttonbar.ActionMenu:
 		return m.sortWindowCmd()
+
+	case buttonbar.ActionPullDn:
+		m.main.TopMenu().Toggle()
+
+		return nil
 	}
 
-	m.showMock(action)
+	m.showMockText(action.Name() + " is not implemented yet")
+
+	return nil
+}
+
+// handleTopMenuActivation resolves an item chosen in the top menu. Files items
+// carry a function-button action and route through the shared dispatch; every
+// other item is a placeholder reported through the mock dialog. The menu is
+// deactivated before dispatch so a dialog never opens under an active menu.
+func (m *Model) handleTopMenuActivation(msg topmenu.ActivateMsg) tea.Cmd {
+	m.main.TopMenu().Deactivate()
+
+	if msg.Action != 0 {
+		return m.handleBarActivation(msg.Action)
+	}
+
+	m.showMockText(msg.Label + " is not implemented yet")
 
 	return nil
 }
@@ -187,15 +212,13 @@ func (m *Model) sortWindowCmd() tea.Cmd {
 	}
 }
 
-// showMock reports a not-yet-implemented bar action. Only one mock dialog is
+// showMockText reports a not-yet-implemented action. Only one mock dialog is
 // kept open: a later activation updates the existing dialog's text in place
 // instead of stacking another window and goroutine. It runs on the event loop,
 // so it must not send a message to the program (the message channel is
 // unbuffered and single-reader): the window is rendered by the normal
 // post-Update render.
-func (m *Model) showMock(action buttonbar.Action) {
-	text := action.Name() + " is not implemented yet"
-
+func (m *Model) showMockText(text string) {
 	m.mockMu.Lock()
 
 	if m.mockDialog != nil {
