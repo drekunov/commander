@@ -53,7 +53,7 @@ func (m *Confirm) View() string {
 		return ""
 	}
 
-	message := m.styles.TextStyle.Render(m.message)
+	message := m.textStyle().Render(m.message)
 
 	buttons := lipgloss.JoinHorizontal(
 		lipgloss.Center,

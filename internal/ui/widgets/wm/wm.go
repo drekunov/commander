@@ -160,6 +160,21 @@ func (m *Manager) Windows() []*Window {
 	return m.sortedWindows()
 }
 
+// FocusedWindowID returns the ID of the focused window, or -1 when no window is
+// focused.
+func (m *Manager) FocusedWindowID() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, win := range m.windows {
+		if win.Focused {
+			return win.ID
+		}
+	}
+
+	return -1
+}
+
 // Init initializes all windows.
 func (m *Manager) Init() tea.Cmd {
 	m.mu.Lock()

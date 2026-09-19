@@ -82,9 +82,15 @@ func newCanvas(width, height int) *canvas {
 // Overlay composites foreground text on top of background text
 // within the given dimensions.
 func Overlay(background, foreground string, width, height int) string {
+	return OverlayAt(background, foreground, 0, 0, width, height)
+}
+
+// OverlayAt composites foreground text on top of background text at (x, y)
+// within the given dimensions, preserving the background on either side.
+func OverlayAt(background, foreground string, x, y, width, height int) string {
 	cvs := newCanvas(width, height)
 	cvs.stamp(0, 0, background)
-	cvs.stamp(0, 0, foreground)
+	cvs.stamp(x, y, foreground)
 
 	return cvs.String()
 }

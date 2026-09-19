@@ -45,3 +45,33 @@ The CSS engine SHALL recognize the `font-weight: bold` declaration and apply bol
 #### Scenario: Bold follows a working-directory override
 - **WHEN** a `styles.css` override sets `font-weight: bold` on a class
 - **THEN** widgets using that class render bold text
+
+### Requirement: CSS style classes cover the top menu
+The CSS engine SHALL expose style classes for the top menu bar so a theme can restyle it: a class for the bar background, a class for inactive captions, a class for the active caption, a class for the hotkey letter, a class for the pull-down background, and a class for the focused pull-down item. Each class SHALL be loaded into its own field on the injected `Styles` value, and no top-menu class SHALL be required for the others to work.
+
+#### Scenario: Top-menu selectors load into style fields
+- **WHEN** the stylesheet defines the top-menu classes
+- **THEN** `LoadStyles` populates the matching top-menu style fields
+
+#### Scenario: Working-directory override restyles the top menu
+- **WHEN** a working-directory `styles.css` sets the top-menu classes to colors different from the embedded theme
+- **THEN** the loaded styles reflect the override and the top menu renders with those colors
+
+#### Scenario: Missing class falls back
+- **WHEN** a stylesheet omits one or more top-menu classes
+- **THEN** the remaining top-menu classes still load and the menu stays renderable
+
+### Requirement: Theme classes cover the dialog set and frame chrome
+The styling system SHALL expose theme classes for the dialog body text, the dialog input, the dialog buttons, the dialog menu options (selected and unselected), and the window frame chrome (frame border and background, focused title, unfocused title, and resize grip), so a working-directory `styles.css` can restyle every visible part of a dialog.
+
+#### Scenario: Override restyles the dialog body
+- **WHEN** a working-directory `styles.css` sets a style on the dialog body class
+- **THEN** the dialog set renders its body with that style
+
+#### Scenario: Override restyles the menu options
+- **WHEN** a working-directory `styles.css` sets styles on the selected and unselected menu option classes
+- **THEN** the sort window renders its option rows with those styles
+
+#### Scenario: Override restyles the frame chrome
+- **WHEN** a working-directory `styles.css` sets styles on the frame, title, or grip classes
+- **THEN** windows render their frame, title, and resize grip with those styles

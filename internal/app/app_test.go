@@ -231,6 +231,42 @@ func TestNavigateDeliversToRequestedPanel(t *testing.T) {
 	}
 }
 
+func TestRefreshDeliversToBothPanels(t *testing.T) {
+	t.Parallel()
+
+	uiFake := newFakeUI()
+	connFake := newFakeConnector()
+	connFake.dirs["/"] = rows("etc")
+	connFake.dirs["/a"] = rows("a")
+	connFake.dirs["/b"] = rows("b")
+
+	appInstance := app.New(uiFake, connFake)
+	runApp(t, appInstance)
+
+	waitForData(t, uiFake) // left
+	waitForData(t, uiFake) // right
+
+	appInstance.Refresh([]app.NavRequest{
+		{Panel: app.PanelLeft, Dir: "/a"},
+		{Panel: app.PanelRight, Dir: "/b"},
+	})
+
+	got := map[app.PanelID]string{}
+
+	for range 2 {
+		call := waitForData(t, uiFake)
+		got[call.panel] = call.dir
+	}
+
+	if got[app.PanelLeft] != "/a" {
+		t.Errorf("left panel refreshed to %q, want /a", got[app.PanelLeft])
+	}
+
+	if got[app.PanelRight] != "/b" {
+		t.Errorf("right panel refreshed to %q, want /b", got[app.PanelRight])
+	}
+}
+
 func TestNavigateKeepsLatestRequest(t *testing.T) {
 	t.Parallel()
 

@@ -33,7 +33,7 @@ The bar SHALL display ten buttons, ordered left to right, each labeled with its 
 - **THEN** the bar still renders as a single row that ends at the right edge of the screen without wrapping or corrupting the display
 
 ### Requirement: Function keys activate their matching button
-Pressing a function key F1 through F10 SHALL activate the button with the same number (F1 activates 1Help, ..., F10 activates 10Quit), regardless of which window or panel currently has focus.
+Pressing a function key F1 through F10 SHALL activate the button with the same number (F1 activates 1Help, ..., F10 activates 10Quit), regardless of which window or panel currently has focus, except while a dialog is open: then F1 through F9 SHALL NOT activate a button. F10 SHALL always quit.
 
 #### Scenario: Function key activates its button
 - **WHEN** the user presses a function key while any panel is focused
@@ -42,6 +42,10 @@ Pressing a function key F1 through F10 SHALL activate the button with the same n
 #### Scenario: Focused button key map
 - **WHEN** the user presses F10
 - **THEN** the 10Quit button is activated and the application quits
+
+#### Scenario: Dialog blocks function keys
+- **WHEN** a dialog is open and the user presses F1 through F9
+- **THEN** no button is activated and the dialog stays open
 
 ### Requirement: Buttons are reachable and activate by mouse click
 The system SHALL accept a mouse click on a rendered button as an activation of that button, and SHALL support keyboard focus navigation across the bar so the focused button can be activated with Enter.
@@ -55,14 +59,22 @@ The system SHALL accept a mouse click on a rendered button as an activation of t
 - **THEN** left and right arrow keys move the focus between adjacent buttons and pressing Enter activates the focused button
 
 ### Requirement: Activated buttons give visible feedback
-When a button is activated, the system SHALL briefly render it in its pressed state and then render the consequence of the action, so the user sees which button was triggered.
+When a button is activated, the system SHALL render it in its pressed state at the moment of activation and SHALL clear that pressed state when the activation is dispatched, so the button returns to its normal style before or as the consequence of the action appears. A button whose action opens a dialog SHALL NOT remain pressed while the dialog is open.
 
 #### Scenario: Pressed state shown on activation
 - **WHEN** a button is activated by key or mouse
 - **THEN** the button is shown in its pressed styling at the moment of activation
 
+#### Scenario: Pressed state ends when the action is dispatched
+- **WHEN** a button is activated and its action has been dispatched
+- **THEN** the button is rendered in its normal style and is no longer shown as pressed
+
+#### Scenario: Button does not stay pressed while its dialog is open
+- **WHEN** a button such as Menu opens a dialog
+- **THEN** the button is rendered unpressed for as long as the dialog remains open
+
 ### Requirement: Non-quit actions are mocks that report their name
-Activating any button from 1Help through 9PullDn SHALL run a placeholder mock action that reports which action was requested without performing a real file operation, and SHALL NOT modify any file, directory, panel data, or the application state.
+Activating any button from 1Help through 8Delete, except the Menu button, SHALL run a placeholder mock action that reports which action was requested without performing a real file operation, and SHALL NOT modify any file, directory, panel data, or the application state. The Menu button SHALL instead open the panel sort window. The 9PullDn button SHALL instead activate the top menu bar.
 
 #### Scenario: Mock action reports its name
 - **WHEN** the user activates a non-quit button such as 5Copy
@@ -71,6 +83,14 @@ Activating any button from 1Help through 9PullDn SHALL run a placeholder mock ac
 #### Scenario: Mock activation is safe on an empty selection
 - **WHEN** the user activates a non-quit button while no file entry is selected
 - **THEN** the mock action still reports its placeholder result and the application does not crash or error
+
+#### Scenario: Menu selects the sort mode
+- **WHEN** the user activates the Menu button
+- **THEN** the focused panel's sort window opens and no mock dialog is shown
+
+#### Scenario: Pull down opens the top menu
+- **WHEN** the user activates the 9PullDn button
+- **THEN** the top menu bar activates and no mock dialog is shown
 
 ### Requirement: Mock actions expose a replaceable action contract
 The system SHALL route every button activation through a single action-dispatch mechanism so that replacing a mock behavior with a real implementation does not change how buttons are rendered, focused, or activated.
@@ -122,3 +142,25 @@ The bar SHALL lay its ten buttons out with equal width. Each button SHALL render
 #### Scenario: Narrow terminal shrinks buttons equally
 - **WHEN** the terminal is too narrow for ten eight-cell buttons
 - **THEN** the buttons shrink to equal widths and each label is truncated to fit
+
+### Requirement: Mock dialog is titled Unimplemented
+When activating a button that is not yet implemented, the system SHALL show the placeholder mock dialog with the title `Unimplemented` and a body that names the requested action.
+
+#### Scenario: Unimplemented action shows the Unimplemented dialog
+- **WHEN** the user activates a button such as 3View
+- **THEN** the dialog title reads `Unimplemented` and its body names the requested action
+
+#### Scenario: Repeated activation keeps the title
+- **WHEN** the user activates another unimplemented button while the mock dialog is open
+- **THEN** the dialog stays titled `Unimplemented` and updates its body to the new action
+
+### Requirement: Opening the mock dialog does not block the application
+Opening or updating the placeholder mock dialog SHALL NOT block the application: the dialog SHALL be shown and the application SHALL keep rendering and responding to input while it is open.
+
+#### Scenario: Application stays responsive
+- **WHEN** an unimplemented button opens the mock dialog
+- **THEN** the dialog is shown and the application still responds to other keys such as the quit key
+
+#### Scenario: Re-activation updates in place
+- **WHEN** the mock dialog is already tracked and another unimplemented action is reported
+- **THEN** the dialog text updates and the application stays responsive

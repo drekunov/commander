@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -11,9 +12,16 @@ import (
 	"github.com/drekunov/gc/internal/ui/widgets/dialogs"
 	"github.com/drekunov/gc/internal/ui/widgets/mainform"
 	"github.com/drekunov/gc/internal/ui/widgets/panel"
+	"github.com/drekunov/gc/internal/ui/widgets/topmenu"
 )
 
-const dumpScreenKey = tea.KeyF12
+const (
+	dumpScreenKey = tea.KeyF12
+
+	// sortWindowCaption is the sort window's caption; the instruction lives in
+	// the caption rather than as a body line.
+	sortWindowCaption = "Sort by"
+)
 
 type Model struct {
 	program *tea.Program
@@ -27,6 +35,9 @@ type Model struct {
 
 	// navigator resolves panel navigation requests (see SetNavigator).
 	navigator func(app.PanelID, string)
+
+	// refresher resolves a batch refresh of both panels (see SetRefresher).
+	refresher func([]app.NavRequest)
 
 	// quit is closed when the tea program exits so goroutines that show
 	// dialogs never outlive the application.
@@ -70,16 +81,26 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) { //nolint: gocritic
 	case tea.KeyMsg:
-		if msg.Type == tea.KeyF10 {
-			return m, tea.Quit
-		}
-
-		if msg.Type == dumpScreenKey {
-			return m, m.dumpCmd(m.View())
+		if cmd, handled := m.handleGlobalKey(msg); handled {
+			return m, cmd
 		}
 
 	case buttonbar.ActivateMsg:
+		m.main.Bar().ClearPressed()
+
 		return m, m.handleBarActivation(msg.Action)
+
+	case topmenu.ActivateMsg:
+		return m, m.handleTopMenuActivation(msg)
+
+	case sortColumnMsg:
+		if msg.column != "" {
+			if p := m.main.FocusedPanel(); p != nil {
+				p.SortBy(msg.column)
+			}
+		}
+
+		return m, nil
 
 	case panel.NavigateMsg:
 		m.handleNavigate(msg)
@@ -98,6 +119,26 @@ func (m *Model) View() string {
 	return m.main.View()
 }
 
+// handleGlobalKey processes keys the ui owns before windows see them: F10
+// quits, F12 dumps the screen, and Ctrl+R refreshes both panels unless a modal
+// dialog is open. It reports whether the key was handled.
+func (m *Model) handleGlobalKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.Type {
+	case tea.KeyF10:
+		return tea.Quit, true
+	case dumpScreenKey:
+		return m.dumpCmd(m.View()), true
+	case tea.KeyCtrlR:
+		if !m.main.DialogOpen() {
+			m.refreshPanels()
+		}
+
+		return nil, true
+	}
+
+	return nil, false
+}
+
 // dumpCmd returns a command that writes the captured frame to a dump file,
 // ignoring write errors so a failed dump never disturbs the running UI.
 func (m *Model) dumpCmd(frame string) tea.Cmd {
@@ -108,46 +149,92 @@ func (m *Model) dumpCmd(frame string) tea.Cmd {
 	}
 }
 
-// handleBarActivation resolves a function-button activation. Quit is the one
-// real action; every other button reports a mock placeholder through the Info
+// handleBarActivation resolves a function-button activation. Quit and Menu are
+// real actions; every other button reports a mock placeholder through the Info
 // dialog. This switch is the seam where real actions later replace the mocks.
 func (m *Model) handleBarActivation(action buttonbar.Action) tea.Cmd {
-	if action == buttonbar.ActionQuit {
+	switch action {
+	case buttonbar.ActionQuit:
 		return tea.Quit
+
+	case buttonbar.ActionMenu:
+		return m.sortWindowCmd()
+
+	case buttonbar.ActionPullDn:
+		m.main.TopMenu().Toggle()
+
+		return nil
 	}
 
-	m.showMock(action)
+	m.showMockText(action.Name() + " is not implemented yet")
 
 	return nil
 }
 
-// showMock reports a not-yet-implemented bar action. Only one mock dialog is
-// kept open: a later activation updates the existing dialog's text in place
-// instead of stacking another window and goroutine. Runs on the event loop.
-func (m *Model) showMock(action buttonbar.Action) {
-	text := action.Name() + " is not implemented yet"
+// handleTopMenuActivation resolves an item chosen in the top menu. Files items
+// carry a function-button action and route through the shared dispatch; every
+// other item is a placeholder reported through the mock dialog. The menu is
+// deactivated before dispatch so a dialog never opens under an active menu.
+func (m *Model) handleTopMenuActivation(msg topmenu.ActivateMsg) tea.Cmd {
+	m.main.TopMenu().Deactivate()
 
+	if msg.Action != 0 {
+		return m.handleBarActivation(msg.Action)
+	}
+
+	m.showMockText(msg.Label + " is not implemented yet")
+
+	return nil
+}
+
+// sortColumnMsg carries the column chosen in the sort window back to the event
+// loop, where the focused panel is mutated.
+type sortColumnMsg struct {
+	column string
+}
+
+// sortWindowCmd opens the modal column list for the focused panel and resolves
+// to the chosen column. The dialog blocks, so it runs as a command off the
+// event loop; an empty column means the window was canceled.
+func (m *Model) sortWindowCmd() tea.Cmd {
+	focused := m.main.FocusedPanel()
+	if focused == nil {
+		return nil
+	}
+
+	titles := focused.ColumnTitles()
+	if len(titles) == 0 {
+		return nil
+	}
+
+	return func() tea.Msg {
+		return sortColumnMsg{column: m.Select(context.Background(), sortWindowCaption, "", titles)}
+	}
+}
+
+// showMockText reports a not-yet-implemented action. Only one mock dialog is
+// kept open: a later activation updates the existing dialog's text in place
+// instead of stacking another window and goroutine. It runs on the event loop,
+// so it must not send a message to the program (the message channel is
+// unbuffered and single-reader): the window is rendered by the normal
+// post-Update render.
+func (m *Model) showMockText(text string) {
 	m.mockMu.Lock()
 
 	if m.mockDialog != nil {
 		m.mockDialog.SetText(text)
 		m.mockMu.Unlock()
 
-		m.sendMsg(tea.ResumeMsg{})
-
 		return
 	}
 
 	info := dialogs.NewInfo(m.styles)
 	info.SetText(text)
-	info.SetTitle("Mock")
 	info.SetVisible(true)
 
 	m.mockDialog = info
-	m.mockWinID = m.addDialogWindow(info, "Mock")
+	m.mockWinID = m.addDialogWindow(info, "Unimplemented")
 	m.mockMu.Unlock()
-
-	m.sendMsg(tea.ResumeMsg{})
 
 	go m.waitMock(info)
 }
@@ -173,7 +260,7 @@ func (m *Model) waitMock(info *dialogs.Info) {
 	m.mockWinID = 0
 	m.mockMu.Unlock()
 
-	m.main.WM().Remove(id)
+	m.closeDialogWindow(id)
 }
 
 // handleNavigate forwards a panel navigation request to the app's directory

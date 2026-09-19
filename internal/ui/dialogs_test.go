@@ -3,6 +3,7 @@ package ui
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/drekunov/gc/internal/config"
 	"github.com/drekunov/gc/internal/ui/widgets/buttonbar"
 	"github.com/drekunov/gc/internal/ui/widgets/mainform"
+	"github.com/drekunov/gc/internal/ui/widgets/topmenu"
 )
 
 func newTestModel() *Model {
@@ -124,13 +126,13 @@ func TestRepeatedMockActivationReusesDialog(t *testing.T) {
 
 	defer model.stop()
 
-	model.showMock(buttonbar.ActionCopy)
+	model.showMockText("Copy is not implemented yet")
 
 	model.mockMu.Lock()
 	first := model.mockDialog
 	model.mockMu.Unlock()
 
-	model.showMock(buttonbar.ActionEdit)
+	model.showMockText("Edit is not implemented yet")
 
 	model.mockMu.Lock()
 	second := model.mockDialog
@@ -146,5 +148,119 @@ func TestRepeatedMockActivationReusesDialog(t *testing.T) {
 
 	if got := len(model.main.WM().Windows()); got != 3 {
 		t.Errorf("window count = %d, want 3 (two panels and one mock dialog)", got)
+	}
+}
+
+func TestMockDialogTitleIsUnimplemented(t *testing.T) {
+	t.Parallel()
+
+	model := &Model{
+		main:    mainform.New(config.Styles{}),
+		styles:  config.Styles{},
+		sendMsg: func(tea.Msg) {},
+		quit:    make(chan struct{}),
+	}
+
+	defer model.stop()
+
+	model.showMockText("View is not implemented yet")
+
+	model.mockMu.Lock()
+	id := model.mockWinID
+	model.mockMu.Unlock()
+
+	win := model.main.WM().Get(id)
+	if win == nil {
+		t.Fatal("mock dialog window was not created")
+	}
+
+	if win.Title != "Unimplemented" {
+		t.Errorf("mock dialog title = %q, want Unimplemented", win.Title)
+	}
+}
+
+// showMockText runs on the event loop; posting to the program from there would
+// deadlock on the program's unbuffered, single-reader message channel.
+func TestShowMockDoesNotPostToProgram(t *testing.T) {
+	t.Parallel()
+
+	posted := 0
+
+	model := &Model{
+		main:    mainform.New(config.Styles{}),
+		styles:  config.Styles{},
+		sendMsg: func(tea.Msg) { posted++ },
+		quit:    make(chan struct{}),
+	}
+
+	defer model.stop()
+
+	model.showMockText("View is not implemented yet")
+
+	if posted != 0 {
+		t.Errorf("showMock posted %d message(s) from the event loop; want 0", posted)
+	}
+}
+
+func TestPullDnActivatesTopMenu(t *testing.T) {
+	t.Parallel()
+
+	model := newTestModel()
+
+	model.handleBarActivation(buttonbar.ActionPullDn)
+
+	if !model.main.TopMenu().Active() {
+		t.Error("9PullDn did not activate the top menu")
+	}
+
+	if model.mockDialog != nil {
+		t.Error("9PullDn opened a mock dialog instead of the top menu")
+	}
+}
+
+func TestTopMenuFilesItemDispatchesBarAction(t *testing.T) {
+	t.Parallel()
+
+	model := newTestModel()
+	model.main.TopMenu().Activate()
+
+	cmd := model.handleTopMenuActivation(topmenu.ActivateMsg{Action: buttonbar.ActionQuit})
+	if cmd == nil {
+		t.Fatal("a Files action produced no command")
+	}
+
+	if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Errorf("Files action resolved to %T, want tea.QuitMsg", cmd())
+	}
+
+	if model.main.TopMenu().Active() {
+		t.Error("the top menu stayed active after an item was activated")
+	}
+}
+
+func TestTopMenuPlaceholderReportsLabel(t *testing.T) {
+	t.Parallel()
+
+	model := &Model{
+		main:    mainform.New(config.Styles{}),
+		styles:  config.Styles{},
+		sendMsg: func(tea.Msg) {},
+		quit:    make(chan struct{}),
+	}
+
+	defer model.stop()
+
+	model.Update(topmenu.ActivateMsg{Label: "Find file"})
+
+	model.mockMu.Lock()
+	dialog := model.mockDialog
+	model.mockMu.Unlock()
+
+	if dialog == nil {
+		t.Fatal("a placeholder item did not open the mock dialog")
+	}
+
+	if !strings.Contains(dialog.View(), "Find file") {
+		t.Errorf("mock dialog does not name the placeholder item:\n%s", dialog.View())
 	}
 }

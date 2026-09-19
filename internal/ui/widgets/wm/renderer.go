@@ -8,6 +8,18 @@ import (
 	"github.com/drekunov/gc/internal/config"
 )
 
+// titleOpen and titleClose decorate a window title in its title bar.
+const (
+	titleOpen  = "[ "
+	titleClose = " ]"
+)
+
+// TitleWidth returns the rendered width of a window title including its
+// decoration, so a window can be sized to keep its title untruncated.
+func TitleWidth(title string) int {
+	return lipgloss.Width(titleOpen + title + titleClose)
+}
+
 // renderer draws a window's frame, title bar, and resize grip using the
 // configured theme. It is a pure state-to-string transform.
 type renderer struct {
@@ -92,7 +104,7 @@ func (r *renderer) buildTitleBar(win *Window, innerW int) string {
 	borderFg := r.styles.DialogBoxStyle.GetBorderBottomForeground()
 
 	// NC-style title: [ Title ]
-	title := "[ " + win.Title + " ]"
+	title := titleOpen + win.Title + titleClose
 
 	titleLen := lipgloss.Width(title)
 	if titleLen > innerW {
@@ -106,18 +118,13 @@ func (r *renderer) buildTitleBar(win *Window, innerW int) string {
 
 	borderStyle := lipgloss.NewStyle().Foreground(borderFg).Background(bgColor)
 
+	// Focused and unfocused titles come from the theme, falling back to the
+	// frame border color and background when a class is unset.
 	var titleStyle lipgloss.Style
 	if win.Focused {
-		// Focused: bright white title, bold — matches NC active dialog style.
-		titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(bgColor).
-			Bold(true)
+		titleStyle = r.styles.WindowTitleStyle.Inherit(borderStyle)
 	} else {
-		// Unfocused: same cyan as the border, no bold.
-		titleStyle = lipgloss.NewStyle().
-			Foreground(borderFg).
-			Background(bgColor)
+		titleStyle = r.styles.WindowTitleUnfocusedStyle.Inherit(borderStyle)
 	}
 
 	leftPart := border.TopLeft + strings.Repeat(border.Top, left)
@@ -138,8 +145,9 @@ func (r *renderer) buildResizeGrip(innerW int) string {
 		gripRune +
 		border.BottomRight
 
-	return lipgloss.NewStyle().
+	frameStyle := lipgloss.NewStyle().
 		Foreground(r.styles.DialogBoxStyle.GetBorderBottomForeground()).
-		Background(bgColor).
-		Render(grip)
+		Background(bgColor)
+
+	return r.styles.WindowGripStyle.Inherit(frameStyle).Render(grip)
 }

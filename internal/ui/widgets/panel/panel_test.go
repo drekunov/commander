@@ -15,6 +15,8 @@ import (
 const (
 	attrNameLower  = "name"
 	attrIsDirLower = "isdir"
+	attrDate       = "Date"
+	attrTime       = "Time"
 	subName        = "sub"
 )
 
@@ -80,8 +82,8 @@ func TestSetData(t *testing.T) {
 		t.Fatalf("expected 2 columns, got %d", len(cols))
 	}
 
-	if cols[0].Title != attrName {
-		t.Errorf("cols[0].Title = %q, want Name", cols[0].Title)
+	if titles := panelModel.ColumnTitles(); titles[0] != attrName {
+		t.Errorf("columnTitles[0] = %q, want Name", titles[0])
 	}
 
 	rows := panelModel.tableView.Rows()
@@ -89,16 +91,13 @@ func TestSetData(t *testing.T) {
 		t.Fatalf("expected 2 entry rows, got %d", len(rows))
 	}
 
-	if rows[0][0] != "a.txt" {
-		t.Errorf("first entry not rendered: rows[0][0] = %q", rows[0][0])
+	// Directories sort above files.
+	if rows[0][0] != subName || rows[0][1] != "true" {
+		t.Errorf("directory row = %v, want [sub true]", rows[0])
 	}
 
-	if rows[1][0] != subName {
-		t.Errorf("rows[1][0] = %q, want sub", rows[1][0])
-	}
-
-	if rows[1][1] != "true" {
-		t.Errorf("rows[1][1] = %q, want true", rows[1][1])
+	if rows[1][0] != "a.txt" || rows[1][1] != "false" {
+		t.Errorf("file row = %v, want [a.txt false]", rows[1])
 	}
 }
 
@@ -111,6 +110,64 @@ func TestSetDataNoRows(t *testing.T) {
 
 	if len(panelModel.tableView.Rows()) != 0 {
 		t.Error("table should be empty when no data is provided")
+	}
+}
+
+func TestSetDataSameDirPreservesSelection(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.Focus()
+	model.SetData("/a", testListing("d:b", "f1", "f2"))
+
+	// Display rows are [.., b, f1, f2]; select f2.
+	model.tableView.MoveDown(3)
+
+	selected := model.selectedEntryName()
+	if selected != "f2" {
+		t.Fatalf("selected entry = %q, want f2", selected)
+	}
+
+	model.PreserveSelection()
+	model.SetData("/a", testListing("d:b", "f1", "f2"))
+
+	if got := model.selectedEntryName(); got != selected {
+		t.Errorf("selection after refresh = %q, want %q", got, selected)
+	}
+}
+
+func TestSetDataSameDirMissingEntryFallsBackToFirstRow(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.Focus()
+	model.SetData("/a", testListing("d:b", "f1", "f2"))
+
+	model.tableView.MoveDown(3) // select f2
+
+	model.PreserveSelection()
+
+	// f2 is gone; the cursor returns to the first display row.
+	model.SetData("/a", testListing("d:b", "f1"))
+
+	if got := model.tableView.Cursor(); got != 0 {
+		t.Errorf("cursor after missing selection = %d, want 0", got)
+	}
+}
+
+func TestSetDataDifferentDirResetsSelection(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.Focus()
+	model.SetData("/a", testListing("d:b", "f1", "f2"))
+
+	model.tableView.MoveDown(3) // select f2
+
+	model.SetData("/b", testListing("d:c", "f3", "f4"))
+
+	if got := model.tableView.Cursor(); got != 0 {
+		t.Errorf("cursor after navigating to a different dir = %d, want 0", got)
 	}
 }
 
@@ -145,7 +202,7 @@ func TestEnterOnFileEmitsNothing(t *testing.T) {
 
 	model := NewPanel(config.Styles{})
 	model.SetPanelID(app.PanelLeft)
-	model.SetData("/etc", testListing("fhosts", "fpasswd", "d:sub"))
+	model.SetData("/etc", testListing("fhosts", "fpasswd"))
 
 	model.Focus()
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
@@ -588,6 +645,18 @@ func tallListing(n int) []app.AttributeList {
 	return testListing(append(names, "d:target")...)
 }
 
+// tallDirListing returns a listing of n directories plus a directory named
+// target. Directories sort above files, so target sorts last among the
+// directories and stays below the fold on a small panel.
+func tallDirListing(n int) []app.AttributeList {
+	names := make([]string, 0, n+1)
+	for i := range n {
+		names = append(names, fmt.Sprintf("d:dir%02d", i))
+	}
+
+	return testListing(append(names, "d:target")...)
+}
+
 func TestAscendScrollsRestoredEntryIntoView(t *testing.T) {
 	t.Parallel()
 
@@ -597,7 +666,7 @@ func TestAscendScrollsRestoredEntryIntoView(t *testing.T) {
 	model.SetHeight(5)
 	model.Focus()
 
-	listing := tallListing(19)
+	listing := tallDirListing(19)
 
 	model.SetData("/a", listing)
 
@@ -694,6 +763,361 @@ func TestHeaderFollowsCustomTableBackground(t *testing.T) {
 	}
 }
 
+func TestHiddenAttributesAreNotColumns(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetData("/a", []app.AttributeList{hiddenHeader(), hiddenEntry()})
+
+	assertHiddenColumns(t, model)
+	assertHiddenRows(t, model)
+
+	// Directory detection still works through the hidden attribute.
+	model.SetPanelID(app.PanelLeft)
+	model.Focus()
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = mustPanelModel(t, updated)
+
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("Enter on the directory produced no command")
+	}
+
+	if msg, ok := cmd().(NavigateMsg); !ok || msg.Dir != "/a/"+subName {
+		t.Errorf("Enter resolved to %v, want NavigateMsg to /a/%s", cmd(), subName)
+	}
+}
+
+func hiddenHeader() app.AttributeList {
+	return app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName, Width: 11},
+		{AttrName: attrSize, AttrValue: attrSize},
+		{AttrName: attrIsDir, AttrValue: attrIsDir, Hidden: true},
+	}
+}
+
+func hiddenEntry() app.AttributeList {
+	return app.AttributeList{
+		{AttrName: attrName, AttrValue: subName},
+		{AttrName: attrSize, AttrValue: parentSizeValue},
+		{AttrName: attrIsDir, AttrValue: true, Hidden: true},
+	}
+}
+
+func assertHiddenColumns(t *testing.T, model *Model) {
+	t.Helper()
+
+	cols := model.tableView.Columns()
+	if len(cols) != 2 {
+		t.Fatalf("columns = %d, want 2 (IsDir hidden)", len(cols))
+	}
+
+	titles := model.ColumnTitles()
+	if titles[0] != attrName || cols[0].Width != 11 {
+		t.Errorf("col0 = %q/%d, want Name/11", titles[0], cols[0].Width)
+	}
+
+	if titles[1] != attrSize || cols[1].Width != defaultColumnWidth {
+		t.Errorf("col1 = %q/%d, want Size/%d", titles[1], cols[1].Width, defaultColumnWidth)
+	}
+}
+
+func assertHiddenRows(t *testing.T, model *Model) {
+	t.Helper()
+
+	rows := model.tableView.Rows()
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want 2 (parent + entry)", len(rows))
+	}
+
+	entryRow := rows[1]
+	if len(entryRow) != 2 {
+		t.Fatalf("entry row has %d cells, want 2 (IsDir hidden)", len(entryRow))
+	}
+
+	if entryRow[0] != subName || entryRow[1] != parentSizeValue {
+		t.Errorf("entry row = %v, want [%s <DIR>]", entryRow, subName)
+	}
+}
+
+func TestParentRowShowsNameAndDirSize(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+
+	header := app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName, Width: 11},
+		{AttrName: attrSize, AttrValue: attrSize, Width: 6},
+		{AttrName: attrDate, AttrValue: attrDate, Width: 10},
+		{AttrName: attrTime, AttrValue: attrTime, Width: 8},
+		{AttrName: attrIsDir, AttrValue: attrIsDir, Hidden: true},
+	}
+
+	model.SetData("/a/b", []app.AttributeList{header})
+
+	rows := model.tableView.Rows()
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1 (parent row)", len(rows))
+	}
+
+	parent := rows[0]
+	if parent[0] != parentLabel {
+		t.Errorf("parent Name = %q, want %q", parent[0], parentLabel)
+	}
+
+	if parent[1] != parentSizeValue {
+		t.Errorf("parent Size = %q, want %q", parent[1], parentSizeValue)
+	}
+}
+
+func TestFlexibleColumnFillsWidePanel(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+
+	header := app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName, Width: 11, Flex: true},
+		{AttrName: attrSize, AttrValue: attrSize, Width: 6},
+	}
+
+	model.SetData("/a", []app.AttributeList{header})
+	model.SetWidth(60)
+
+	cols := model.tableView.Columns()
+	if len(cols) != 2 {
+		t.Fatalf("columns = %d, want 2", len(cols))
+	}
+
+	// padding = 2*2 = 4, fixed = 6, so flex = 60 - 4 - 6 = 50.
+	if cols[0].Width != 50 {
+		t.Errorf("Name width = %d, want 50", cols[0].Width)
+	}
+
+	if cols[1].Width != 6 {
+		t.Errorf("Size width = %d, want 6", cols[1].Width)
+	}
+
+	if model.contentWidth != 60 {
+		t.Errorf("contentWidth = %d, want 60", model.contentWidth)
+	}
+}
+
+func TestFlexibleColumnShrinksToMinimum(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+
+	header := app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName, Width: 11, Flex: true},
+		{AttrName: attrSize, AttrValue: attrSize, Width: 6},
+		{AttrName: attrDate, AttrValue: attrDate, Width: 10},
+	}
+
+	model.SetData("/a", []app.AttributeList{header})
+	model.SetWidth(20)
+
+	cols := model.tableView.Columns()
+	if cols[0].Width != minFlexWidth {
+		t.Errorf("Name width = %d, want %d", cols[0].Width, minFlexWidth)
+	}
+
+	if cols[1].Width != 6 || cols[2].Width != 10 {
+		t.Errorf("fixed widths = %d/%d, want 6/10", cols[1].Width, cols[2].Width)
+	}
+}
+
+func TestNoFlexibleColumnKeepsDeclaredWidths(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+
+	header := app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName, Width: 11},
+		{AttrName: attrSize, AttrValue: attrSize, Width: 6},
+	}
+
+	model.SetData("/a", []app.AttributeList{header})
+	model.SetWidth(100)
+
+	cols := model.tableView.Columns()
+	if cols[0].Width != 11 || cols[1].Width != 6 {
+		t.Errorf("widths = %d/%d, want 11/6", cols[0].Width, cols[1].Width)
+	}
+}
+
+// sortHeader declares the four sortable columns plus the hidden IsDir flag.
+func sortHeader() app.AttributeList {
+	return app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName, Width: 11, Flex: true},
+		{AttrName: attrSize, AttrValue: attrSize, Width: 6},
+		{AttrName: attrDate, AttrValue: attrDate, Width: 10},
+		{AttrName: attrTime, AttrValue: attrTime, Width: 8},
+		{AttrName: attrIsDir, AttrValue: attrIsDir, Hidden: true},
+	}
+}
+
+func TestSortBySelectsColumn(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetData("/", []app.AttributeList{sortHeader()})
+
+	if col, asc := model.SortState(); col != 0 || !asc {
+		t.Fatalf("initial sort = %d/%v, want Name ascending", col, asc)
+	}
+
+	// A different column sorts ascending.
+	model.SortBy(attrSize)
+
+	if col, asc := model.SortState(); col != 1 || !asc {
+		t.Errorf("after SortBy(Size) = %d/%v, want Size ascending", col, asc)
+	}
+
+	// Choosing the current column inverts it.
+	model.SortBy(attrSize)
+
+	if col, asc := model.SortState(); col != 1 || asc {
+		t.Errorf("after SortBy(Size) again = %d/%v, want Size descending", col, asc)
+	}
+
+	// A new column resets to ascending.
+	model.SortBy(attrName)
+
+	if col, asc := model.SortState(); col != 0 || !asc {
+		t.Errorf("after SortBy(Name) = %d/%v, want Name ascending", col, asc)
+	}
+}
+
+func TestSortIsPerPanel(t *testing.T) {
+	t.Parallel()
+
+	left := NewPanel(config.Styles{})
+	right := NewPanel(config.Styles{})
+
+	left.SetData("/", []app.AttributeList{sortHeader()})
+	right.SetData("/", []app.AttributeList{sortHeader()})
+
+	left.SortBy(attrSize)
+
+	if col, asc := left.SortState(); col != 1 || !asc {
+		t.Errorf("left sort = %d/%v, want Size ascending", col, asc)
+	}
+
+	if col, asc := right.SortState(); col != 0 || !asc {
+		t.Errorf("right sort = %d/%v, want Name ascending", col, asc)
+	}
+}
+
+func TestSortKeepsDirectoriesAboveFiles(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetData("/a", testListing("zfile", "afile", "d:zdir", "d:adir"))
+
+	want := []string{parentLabel, "adir", "zdir", "afile", "zfile"}
+
+	rows := model.tableView.Rows()
+	if len(rows) != len(want) {
+		t.Fatalf("rows = %d, want %d", len(rows), len(want))
+	}
+
+	for idx, name := range want {
+		if rows[idx][0] != name {
+			t.Errorf("row %d = %q, want %q", idx, rows[idx][0], name)
+		}
+	}
+}
+
+func TestSortBySizeIsNumeric(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+
+	header := app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName, Width: 11, Flex: true},
+		{AttrName: attrSize, AttrValue: attrSize, Width: 6},
+		{AttrName: attrIsDir, AttrValue: attrIsDir, Hidden: true},
+	}
+
+	small := app.AttributeList{
+		{AttrName: attrName, AttrValue: "small"},
+		{AttrName: attrSize, AttrValue: app.Size(208)},
+		{AttrName: attrIsDir, AttrValue: false, Hidden: true},
+	}
+
+	big := app.AttributeList{
+		{AttrName: attrName, AttrValue: "big"},
+		{AttrName: attrSize, AttrValue: app.Size(4000)},
+		{AttrName: attrIsDir, AttrValue: false, Hidden: true},
+	}
+
+	model.SetData("/", []app.AttributeList{header, big, small})
+
+	model.SortBy(attrSize)
+
+	rows := model.tableView.Rows()
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want 2", len(rows))
+	}
+
+	if rows[0][0] != "small" || rows[1][0] != "big" {
+		t.Errorf("size order = %v/%v, want small/big", rows[0][0], rows[1][0])
+	}
+}
+
+func TestHeaderShowsSortMarker(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetData("/", []app.AttributeList{sortHeader()})
+
+	if got := model.tableView.Columns()[0].Title; got != attrName+sortAscMarker {
+		t.Errorf("Name title = %q, want %q", got, attrName+sortAscMarker)
+	}
+
+	model.SortBy(attrName) // Name descending
+
+	cols := model.tableView.Columns()
+	if cols[0].Title != attrName+sortDescMarker {
+		t.Errorf("Name title = %q, want %q", cols[0].Title, attrName+sortDescMarker)
+	}
+
+	model.SortBy(attrSize) // Size ascending
+
+	cols = model.tableView.Columns()
+	if cols[0].Title != attrName {
+		t.Errorf("Name title = %q, want an unmarked Name", cols[0].Title)
+	}
+
+	if cols[1].Title != attrSize+sortAscMarker {
+		t.Errorf("Size title = %q, want %q", cols[1].Title, attrSize+sortAscMarker)
+	}
+}
+
+func TestSelectionSurvivesResort(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+	model.SetData("/", testListing("zfile", "afile"))
+	model.Focus()
+
+	// Name ascending order is afile, zfile; move the cursor to zfile.
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = mustPanelModel(t, updated)
+
+	model.SortBy(attrName) // Name descending: zfile, afile
+
+	entry, ok := model.selectedEntry()
+	if !ok {
+		t.Fatal("no selected entry after re-sort")
+	}
+
+	if entryName(entry) != "zfile" {
+		t.Errorf("selected entry = %q, want zfile", entryName(entry))
+	}
+}
+
 func TestCursorUsesInjectedStyle(t *testing.T) {
 	t.Parallel()
 
@@ -723,5 +1147,56 @@ func TestCursorUsesInjectedStyle(t *testing.T) {
 
 	if blurred := model.tableStyles().Selected; blurred.GetBackground() != lipgloss.NewStyle().GetBackground() {
 		t.Errorf("blurred cursor background = %v, want no highlight", blurred.GetBackground())
+	}
+}
+
+// TestSchemaChangeResetsSortAndRows verifies that a listing exposing fewer
+// columns than the one currently sorted neither panics while the table is
+// rebuilt nor leaves the sort pointing at a column that no longer exists.
+func TestSchemaChangeResetsSortAndRows(t *testing.T) {
+	t.Parallel()
+
+	model := NewPanel(config.Styles{})
+
+	wide := app.AttributeList{
+		{AttrName: attrName, AttrValue: "sub"},
+		{AttrName: attrSize, AttrValue: parentSizeValue},
+		{AttrName: attrDate, AttrValue: "2026-09-18"},
+		{AttrName: attrTime, AttrValue: "12:00:00"},
+		{AttrName: attrIsDir, AttrValue: true, Hidden: true},
+	}
+
+	model.SetData("/a", []app.AttributeList{sortHeader(), wide})
+	model.SortBy(attrTime)
+
+	if col, _ := model.SortState(); col != 3 {
+		t.Fatalf("sort column = %d, want the Time column 3", col)
+	}
+
+	narrow := app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName, Width: 11, Flex: true},
+		{AttrName: attrSize, AttrValue: attrSize, Width: 6},
+	}
+	narrowEntry := app.AttributeList{
+		{AttrName: attrName, AttrValue: "file"},
+		{AttrName: attrSize, AttrValue: app.Size(10)},
+	}
+
+	// Must not panic: the previous parent row carried more cells than the new
+	// columns, and the stale sort column is out of range for the new schema.
+	model.SetData("/b", []app.AttributeList{narrow, narrowEntry})
+
+	if col, asc := model.SortState(); col != 0 || !asc {
+		t.Errorf("sort = %d/%v after a narrower schema, want 0/true", col, asc)
+	}
+
+	if cols := model.tableView.Columns(); len(cols) != 2 {
+		t.Errorf("columns = %d, want 2", len(cols))
+	}
+
+	for idx, row := range model.tableView.Rows() {
+		if len(row) != 2 {
+			t.Errorf("row %d has %d cells, want 2", idx, len(row))
+		}
 	}
 }

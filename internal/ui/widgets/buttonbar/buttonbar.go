@@ -223,6 +223,13 @@ func (m *Model) SetFocused(focused bool) {
 	m.focused = focused
 }
 
+// ClearPressed drops the pressed flash so a button returns to its normal style
+// once its activation has been dispatched, including while the dialog it opened
+// is visible.
+func (m *Model) ClearPressed() {
+	m.pressed = 0
+}
+
 // handleKey routes key messages. Function keys always activate their button;
 // arrows and Enter only act while the bar is focused.
 func (m *Model) handleKey(msg tea.KeyMsg) tea.Cmd {

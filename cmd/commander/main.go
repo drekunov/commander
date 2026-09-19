@@ -35,6 +35,7 @@ func Run() error {
 	uiInstance := ui.New(styles)
 	appInstance := app.New(uiInstance, fsConn)
 	uiInstance.SetNavigator(appInstance.Navigate)
+	uiInstance.SetRefresher(appInstance.Refresh)
 
 	errGr, _ := errgroup.WithContext(context.Background())
 

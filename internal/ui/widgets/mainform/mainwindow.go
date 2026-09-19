@@ -6,10 +6,14 @@ import (
 	"github.com/drekunov/gc/internal/config"
 	"github.com/drekunov/gc/internal/ui/widgets/buttonbar"
 	"github.com/drekunov/gc/internal/ui/widgets/panel"
+	"github.com/drekunov/gc/internal/ui/widgets/topmenu"
 	"github.com/drekunov/gc/internal/ui/widgets/wm"
 )
 
-const functionBarHeight = 1
+const (
+	topMenuHeight     = 1
+	functionBarHeight = 1
+)
 
 type Model struct {
 	wm            *wm.Manager
@@ -17,7 +21,8 @@ type Model struct {
 	rightPanelID  int
 	width, height int
 
-	bar *buttonbar.Model
+	bar     *buttonbar.Model
+	topMenu *topmenu.Model
 }
 
 func New(styles config.Styles) *Model {
@@ -40,6 +45,7 @@ func New(styles config.Styles) *Model {
 		leftPanelID:  leftID,
 		rightPanelID: rightID,
 		bar:          buttonbar.New(styles),
+		topMenu:      topmenu.New(styles),
 	}
 	model.syncPanelFocus()
 
@@ -86,18 +92,19 @@ func (m *Model) View() string {
 		return ""
 	}
 
+	top := m.topMenu.View(m.width)
 	bar := m.bar.View()
 
-	if m.height <= functionBarHeight {
-		return bar
+	if m.height <= topMenuHeight {
+		return top
 	}
 
 	canvas := m.wm.View()
 	if canvas == "" {
-		return bar
+		return top + "\n" + bar
 	}
 
-	return canvas + "\n" + bar
+	return top + "\n" + m.overlayPulldown(canvas) + "\n" + bar
 }
 
 // WM returns the underlying window manager (used for dialogs and overlays).
@@ -108,6 +115,11 @@ func (m *Model) WM() *wm.Manager {
 // Bar returns the function-button bar widget.
 func (m *Model) Bar() *buttonbar.Model {
 	return m.bar
+}
+
+// TopMenu returns the top menu bar widget.
+func (m *Model) TopMenu() *topmenu.Model {
+	return m.topMenu
 }
 
 // Panel returns the left (first) panel.
@@ -122,15 +134,69 @@ func (m *Model) Panel() *panel.Model {
 	return p
 }
 
+// Panels returns the left and right panels in order. A panel may be nil while
+// its window is being rebuilt.
+func (m *Model) Panels() []*panel.Model {
+	return []*panel.Model{m.panelFromWindow(m.leftPanelID), m.panelFromWindow(m.rightPanelID)}
+}
+
+// FocusedPanel returns the panel window that currently holds focus, or nil when
+// no panel is focused.
+func (m *Model) FocusedPanel() *panel.Model {
+	for _, win := range m.wm.Windows() {
+		if !win.Focused {
+			continue
+		}
+
+		if p, ok := win.Content.(*panel.Model); ok {
+			return p
+		}
+	}
+
+	return nil
+}
+
 func (m *Model) Width() int  { return m.width }
 func (m *Model) Height() int { return m.height }
 
-// handleKey routes keys between the function-button bar and the window
-// manager. Function keys activate their button before windows see them;
-// arrows and Enter drive the bar only while it holds keyboard focus.
+// DialogOpen reports whether a dialog window (not a panel) currently holds
+// focus.
+func (m *Model) DialogOpen() bool {
+	id := m.wm.FocusedWindowID()
+
+	return id >= 0 && id != m.leftPanelID && id != m.rightPanelID
+}
+
+// overlayPulldown draws the top menu's open pull-down as a compact box over the
+// canvas at the active caption's column, leaving the panels visible around it.
+func (m *Model) overlayPulldown(canvas string) string {
+	block, startX := m.topMenu.PulldownBlock(m.width)
+	if block == "" {
+		return canvas
+	}
+
+	return wm.OverlayAt(canvas, block, startX, 0, m.width, m.wmHeight())
+}
+
+// handleKey routes keys between the top menu, the function-button bar, and the
+// window manager. Function keys activate their button before windows see them;
+// arrows and Enter drive the bar only while it holds keyboard focus. While a
+// modal dialog is open, F1-F9 are ignored and other keys go to the dialog.
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	if msg.Type == tea.KeyF10 {
 		return tea.Quit, true
+	}
+
+	if m.DialogOpen() {
+		if _, ok := buttonbar.ActionForKey(msg.Type); ok {
+			return nil, true
+		}
+
+		return nil, false
+	}
+
+	if cmd, handled := m.handleTopMenuKey(msg); handled {
+		return cmd, true
 	}
 
 	if _, ok := buttonbar.ActionForKey(msg.Type); ok {
@@ -158,12 +224,57 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	return nil, false
 }
 
+// handleTopMenuKey routes a key while the top menu is active. F9 toggles it,
+// F1-F8 still activate their function buttons, and every other key is owned by
+// the top menu so the focused panel does not react. It reports whether the key
+// was handled.
+func (m *Model) handleTopMenuKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	if !m.topMenu.Active() {
+		return nil, false
+	}
+
+	if msg.Type == tea.KeyF9 {
+		m.topMenu.Toggle()
+
+		return nil, true
+	}
+
+	if _, ok := buttonbar.ActionForKey(msg.Type); ok {
+		m.topMenu.Deactivate()
+
+		_, cmd := m.bar.Update(msg)
+
+		return cmd, true
+	}
+
+	return m.topMenu.Update(msg)
+}
+
 // handleMouse intercepts presses on the bottom bar row, focusing the bar and
 // activating the clicked button. Presses anywhere else clear bar focus so the
 // window manager keeps handling them.
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Cmd, bool) {
 	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
 		return nil, false
+	}
+
+	if m.DialogOpen() {
+		// A modal dialog owns the pointer: clicks outside it are ignored.
+		return nil, true
+	}
+
+	if msg.Y == 0 {
+		m.bar.SetFocused(false)
+
+		cmd, _ := m.topMenu.HandleMouse(msg, m.width)
+
+		return cmd, true
+	}
+
+	if cmd, consumed := m.topMenu.HandleMouse(msg, m.width); consumed {
+		m.bar.SetFocused(false)
+
+		return cmd, true
 	}
 
 	if msg.Y == m.height-functionBarHeight {
@@ -187,9 +298,10 @@ func (m *Model) applyWindowSize() {
 	m.layoutPanels()
 }
 
-// wmHeight returns the canvas height left for windows above the bar row.
+// wmHeight returns the canvas height left for windows between the top menu row
+// and the function bar row.
 func (m *Model) wmHeight() int {
-	height := m.height - functionBarHeight
+	height := m.height - topMenuHeight - functionBarHeight
 	if height < 1 {
 		return 0
 	}

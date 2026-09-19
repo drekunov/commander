@@ -2,11 +2,14 @@
 package wm
 
 import (
+	"io"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/drekunov/gc/internal/config"
+	"github.com/muesli/termenv"
 )
 
 type staticModel struct {
@@ -38,6 +41,56 @@ func TestBuildTitleBar(t *testing.T) {
 
 	if !strings.Contains(out, "[ Files ]") {
 		t.Errorf("title bar %q missing the window title", out)
+	}
+}
+
+func TestTitleBarUsesInjectedTitleStyles(t *testing.T) {
+	t.Parallel()
+
+	lipglossRenderer := lipgloss.NewRenderer(io.Discard)
+	lipglossRenderer.SetColorProfile(termenv.ANSI256)
+
+	renderer := renderer{styles: config.Styles{
+		DialogBoxStyle: lipgloss.NewStyle().
+			Background(lipgloss.Color("#000080")).
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#00AAAA")),
+		WindowTitleStyle:          lipgloss.NewStyle().Bold(true).Renderer(lipglossRenderer),
+		WindowTitleUnfocusedStyle: lipgloss.NewStyle().Italic(true).Renderer(lipglossRenderer),
+	}}
+
+	win := NewWindow(1, staticModel{view: ""}, 0, 0, 20, 10)
+	win.Title = "Files"
+
+	win.Focused = true
+
+	if focused := renderer.buildTitleBar(win, 18); !strings.Contains(focused, "\x1b[1;") {
+		t.Errorf("focused title is not styled bold:\n%q", focused)
+	}
+
+	win.Focused = false
+
+	if unfocused := renderer.buildTitleBar(win, 18); !strings.Contains(unfocused, "\x1b[3;") {
+		t.Errorf("unfocused title is not styled italic:\n%q", unfocused)
+	}
+}
+
+func TestResizeGripUsesInjectedStyle(t *testing.T) {
+	t.Parallel()
+
+	lipglossRenderer := lipgloss.NewRenderer(io.Discard)
+	lipglossRenderer.SetColorProfile(termenv.ANSI256)
+
+	renderer := renderer{styles: config.Styles{
+		DialogBoxStyle: lipgloss.NewStyle().
+			Background(lipgloss.Color("#000080")).
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#00AAAA")),
+		WindowGripStyle: lipgloss.NewStyle().Underline(true).Renderer(lipglossRenderer),
+	}}
+
+	if out := renderer.buildResizeGrip(10); !strings.Contains(out, "\x1b[4;") {
+		t.Errorf("resize grip is not styled underlined:\n%q", out)
 	}
 }
 

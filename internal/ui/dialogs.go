@@ -5,7 +5,9 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/drekunov/gc/internal/ui/widgets/dialogs"
+	"github.com/drekunov/gc/internal/ui/widgets/wm"
 )
 
 const (
@@ -16,12 +18,11 @@ const (
 func (m *Model) Info(ctx context.Context, title, footer, message string) {
 	about := dialogs.NewInfo(m.styles)
 	about.SetText(message)
-	about.SetTitle(title)
 	about.SetFooter(footer)
 	about.SetVisible(true)
 
 	id := m.addDialogWindow(about, title)
-	defer m.main.WM().Remove(id)
+	defer m.closeDialogWindow(id)
 
 	m.sendMsg(tea.ResumeMsg{})
 
@@ -43,12 +44,11 @@ func (m *Model) Password(ctx context.Context, title, message string) string {
 func (m *Model) runInput(ctx context.Context, title, footer, message string, echo textinput.EchoMode) string {
 	input := dialogs.NewInput(m.styles, echo)
 	input.SetText(message)
-	input.SetTitle(title)
 	input.SetFooter(footer)
 	input.SetVisible(true)
 
 	id := m.addDialogWindow(input, title)
-	defer m.main.WM().Remove(id)
+	defer m.closeDialogWindow(id)
 
 	m.sendMsg(tea.ResumeMsg{})
 
@@ -65,11 +65,10 @@ func (m *Model) runInput(ctx context.Context, title, footer, message string, ech
 func (m *Model) Select(ctx context.Context, title, message string, options []string) string {
 	sel := dialogs.NewSelect(m.styles, options, false)
 	sel.SetText(message)
-	sel.SetTitle(title)
 	sel.SetVisible(true)
 
 	id := m.addDialogWindow(sel, title)
-	defer m.main.WM().Remove(id)
+	defer m.closeDialogWindow(id)
 
 	m.sendMsg(tea.ResumeMsg{})
 
@@ -79,6 +78,10 @@ func (m *Model) Select(ctx context.Context, title, message string, options []str
 	case <-m.quit:
 		return ""
 	case <-sel.Done():
+		if sel.Canceled() {
+			return ""
+		}
+
 		return sel.Selection()
 	}
 }
@@ -86,11 +89,10 @@ func (m *Model) Select(ctx context.Context, title, message string, options []str
 func (m *Model) SelectMultiple(ctx context.Context, title, message string, options []string) []string {
 	sel := dialogs.NewSelect(m.styles, options, true)
 	sel.SetText(message)
-	sel.SetTitle(title)
 	sel.SetVisible(true)
 
 	id := m.addDialogWindow(sel, title)
-	defer m.main.WM().Remove(id)
+	defer m.closeDialogWindow(id)
 
 	m.sendMsg(tea.ResumeMsg{})
 
@@ -100,17 +102,20 @@ func (m *Model) SelectMultiple(ctx context.Context, title, message string, optio
 	case <-m.quit:
 		return nil
 	case <-sel.Done():
+		if sel.Canceled() {
+			return nil
+		}
+
 		return sel.Selections()
 	}
 }
 
 func (m *Model) Confirm(ctx context.Context, title, message string) bool {
 	confirm := dialogs.NewConfirm(m.styles, message)
-	confirm.SetTitle(title)
 	confirm.SetVisible(true)
 
 	id := m.addDialogWindow(confirm, title)
-	defer m.main.WM().Remove(id)
+	defer m.closeDialogWindow(id)
 
 	m.sendMsg(tea.ResumeMsg{})
 
@@ -132,24 +137,47 @@ func (m *Model) Warning(title, message string) {
 	m.Info(context.Background(), title, "[Warning]", message)
 }
 
-// addDialogWindow adds a tea.Model as a centered dialog window via the wm.
+// addDialogWindow adds a tea.Model as a centered dialog window via the wm. The
+// window is sized to fit the dialog content plus the window frame, so the frame
+// hugs the content.
 func (m *Model) addDialogWindow(content tea.Model, title string) int {
 	wmgr := m.main.WM()
-	width := wmgr.Width()
-	height := wmgr.Height()
 
-	if width < 2 {
-		width = dialogDefaultWidth
+	canvasW := wmgr.Width()
+	canvasH := wmgr.Height()
+
+	if canvasW < 2 {
+		canvasW = dialogDefaultWidth
 	}
 
-	if height < 2 {
-		height = dialogDefaultHeight
+	if canvasH < 2 {
+		canvasH = dialogDefaultHeight
 	}
 
-	winW := width / 2
-	winH := height / 2
-	posX := (width - winW) / 2
-	posY := (height - winH) / 2
+	view := content.View()
+	innerW := max(lipgloss.Width(view), wm.TitleWidth(title))
+	winW := innerW + wm.FrameCols
+	winH := lipgloss.Height(view) + wm.FrameRows
+
+	if winW > canvasW {
+		winW = canvasW
+	}
+
+	if winH > canvasH {
+		winH = canvasH
+	}
+
+	posX := (canvasW - winW) / 2
+	posY := (canvasH - winH) / 2
 
 	return wmgr.Add(content, title, posX, posY, winW, winH)
+}
+
+// closeDialogWindow removes a dialog window and wakes the event loop so the
+// mainform re-syncs panel focus. Removing the window re-focuses the panel
+// beneath it, but that happens off the event loop, so a message is needed to
+// run the sync and restore the panel's cursor.
+func (m *Model) closeDialogWindow(id int) {
+	m.main.WM().Remove(id)
+	m.sendMsg(tea.ResumeMsg{})
 }

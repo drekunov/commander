@@ -29,6 +29,19 @@
     background-color: #000080;
 }
 
+.dialog-cursor {
+    color: #000000;
+    background-color: #00AAAA;
+    font-weight: bold;
+    padding: 0 1 0 1;
+}
+
+.dialog-option {
+    color: #00AAAA;
+    background-color: #000080;
+    padding: 0 1 0 1;
+}
+
 .text {
     color: #00AAAA;
     padding: 0 0;
@@ -72,4 +85,54 @@
     color: #C0C0C0;
     background-color: #000000;
     font-weight: bold;
+}
+
+.menu-top-bar {
+    color: #C0C0C0;
+    background-color: #000000;
+}
+
+.menu-caption {
+    color: #C0C0C0;
+    background-color: #000000;
+    padding: 0 1 0 1;
+}
+
+.menu-caption-active {
+    color: #000000;
+    background-color: #00AAAA;
+    padding: 0 1 0 1;
+}
+
+.menu-hotkey {
+    color: #FFFF00;
+    background-color: #000000;
+    font-weight: bold;
+}
+
+.menu-pulldown {
+    color: #C0C0C0;
+    background-color: #000080;
+}
+
+.menu-pulldown-cursor {
+    color: #000000;
+    background-color: #00AAAA;
+    font-weight: bold;
+}
+
+.window-title {
+    color: #FFFFFF;
+    background-color: #000080;
+    font-weight: bold;
+}
+
+.window-title-unfocused {
+    color: #00AAAA;
+    background-color: #000080;
+}
+
+.window-grip {
+    color: #00AAAA;
+    background-color: #000080;
 }
