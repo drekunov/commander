@@ -1,0 +1,17 @@
+/* Window frame chrome */
+
+.window-title {
+    color: #FFFFFF;
+    background-color: #000080;
+    font-weight: bold;
+}
+
+.window-title-unfocused {
+    color: #00AAAA;
+    background-color: #000080;
+}
+
+.window-grip {
+    color: #00AAAA;
+    background-color: #000080;
+}

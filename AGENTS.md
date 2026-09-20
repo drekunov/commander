@@ -20,7 +20,7 @@ go test ./...             # no tests exist; passes vacuously
 - **`make lint` rewrites files in place** (`gofumpt -w .`, `gci write . --skip-generated -s standard -s default`), then runs `golangci-lint`. It is not read-only. CI instead runs `golangci-lint` v2.4 via the action without the formatters.
 - **`make build` injects version info via `-ldflags`** into the unexported vars in `internal/app/version.go` (`version`, `commit`, `branch`, `buildUnixTimestamp`). A plain `go build`/`go run` reports `undefined` for all of them. Keep those var names/paths stable or the ldflags silently stop matching.
 - **Lint config is golangci-lint v2** (`.golangci.yml`) with `default: all` — nearly every linter is on. A handful are disabled (`gocritic`, `revive`, `mnd`, `exhaustruct`, `wsl`, etc.); `wsl_v5` is enabled instead of `wsl`. Do not fight linters that CI will flag.
-- **CSS theming loads at init()**: `internal/config/styles.css` is `//go:embed`-ed; a `styles.css` in the process working directory overrides it at runtime (`internal/config/config.go:28`). Overrides are relative to the working directory, not the binary.
+- **CSS theming**: the per-type stylesheets in `internal/config/styles/*.css` are `//go:embed`-ed and concatenated into the default theme; a `styles.css` in the process working directory overrides them at runtime (`internal/config/config.go`). Overrides are relative to the working directory, not the binary.
 
 ## Architecture
 
@@ -29,7 +29,7 @@ cmd/commander/main.go     app entrypoint (runs internal/ui)
 cmd/wm-example/main.go    window manager demo
 internal/
   app/                    App struct, Connector interface, UI interface; version vars (ldflags-injected)
-  config/                 CSS->lipgloss theme engine (embed: styles.css, parse: css.go, styles: config.go)
+  config/                 CSS->lipgloss theme engine (embed: styles/*.css, parse: css.go, styles: config.go)
   connectors/filesystem/  local filesystem Connector
   ui/                     Bubble Tea Model (F10 quits at ui.go:42), main form, dialogs
   ui/widgets/wm/          compositing window manager (z-index, drag-move, drag-resize; only focused window gets keys)

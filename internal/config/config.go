@@ -1,14 +1,49 @@
 package config
 
 import (
-	_ "embed"
+	"embed"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
-//go:embed styles.css
-var defaultCSS string
+//go:embed styles/*.css
+var defaultStyles embed.FS
+
+const (
+	stylesDir = "styles"
+	cssSuffix = ".css"
+)
+
+// themeCSS assembles the embedded default theme from the per-type stylesheet
+// files, concatenated in filename order. Every selector is defined once, so
+// their order does not change the resulting theme.
+func themeCSS() string {
+	entries, err := defaultStyles.ReadDir(stylesDir)
+	if err != nil {
+		return ""
+	}
+
+	var builder strings.Builder
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), cssSuffix) {
+			continue
+		}
+
+		data, readErr := defaultStyles.ReadFile(path.Join(stylesDir, entry.Name()))
+		if readErr != nil {
+			continue
+		}
+
+		builder.Write(data)
+		builder.WriteString("\n")
+	}
+
+	return builder.String()
+}
 
 type Styles struct {
 	ButtonStyle               lipgloss.Style
@@ -54,7 +89,7 @@ func (s Styles) DialogBase() lipgloss.Style {
 // process working directory when present and falling back to the embedded
 // default otherwise.
 func LoadStyles() (Styles, error) {
-	cssData := defaultCSS
+	cssData := themeCSS()
 
 	data, err := os.ReadFile("styles.css")
 	if err == nil {
