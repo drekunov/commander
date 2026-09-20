@@ -17,6 +17,7 @@ const (
 	attrDate  = "Date"
 	attrTime  = "Time"
 	attrIsDir = "IsDir"
+	attrKind  = "Kind"
 )
 
 var (
@@ -67,6 +68,7 @@ func assertHeader(t *testing.T, header app.AttributeList) {
 		{name: attrDate, width: 10},
 		{name: attrTime, width: 8},
 		{name: attrIsDir, width: 0, hidden: true},
+		{name: attrKind, width: 0, hidden: true},
 	}
 
 	if len(header) != len(wantHeader) {
@@ -280,6 +282,124 @@ func TestReadDirBrokenSymlink(t *testing.T) {
 	if got := entryIsDir(t, rows, "link"); got != false {
 		t.Errorf("broken symlink IsDir = %v, want false", got)
 	}
+}
+
+func TestReadDirFileKinds(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	err := os.Mkdir(filepath.Join(dir, "folder"), 0o700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	writeFile(t, filepath.Join(dir, "runme"), 0o700)
+	writeFile(t, filepath.Join(dir, "pic.png"), 0o600)
+	writeFile(t, filepath.Join(dir, "UPPER.PNG"), 0o600)
+	writeFile(t, filepath.Join(dir, "bundle.zip"), 0o600)
+	writeFile(t, filepath.Join(dir, "main.go"), 0o600)
+	writeFile(t, filepath.Join(dir, "config.json"), 0o600)
+	writeFile(t, filepath.Join(dir, "notes.unknown"), 0o600)
+
+	rows, err := filesystem.New().ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]string{
+		"folder":        app.FileKindDirectory,
+		"runme":         app.FileKindExecutable,
+		"pic.png":       app.FileKindImage,
+		"UPPER.PNG":     app.FileKindImage,
+		"bundle.zip":    app.FileKindArchive,
+		"main.go":       app.FileKindSource,
+		"config.json":   app.FileKindConfig,
+		"notes.unknown": "",
+	}
+
+	for name, kind := range want {
+		if got := entryKind(t, rows, name); got != kind {
+			t.Errorf("entry %q kind = %q, want %q", name, got, kind)
+		}
+	}
+}
+
+func TestReadDirSymlinkKinds(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(dir, "target.txt"), []byte("x"), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.Mkdir(filepath.Join(dir, "real"), 0o700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.Symlink("target.txt", filepath.Join(dir, "link"))
+	if err != nil {
+		t.Skipf("symlinks unsupported: %v", err)
+	}
+
+	err = os.Symlink("real", filepath.Join(dir, "linkdir"))
+	if err != nil {
+		t.Skipf("symlinks unsupported: %v", err)
+	}
+
+	rows, err := filesystem.New().ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := entryKind(t, rows, "link"); got != app.FileKindSymlink {
+		t.Errorf("symlink to file kind = %q, want %q", got, app.FileKindSymlink)
+	}
+
+	if got := entryKind(t, rows, "linkdir"); got != app.FileKindDirectory {
+		t.Errorf("symlink to directory kind = %q, want %q", got, app.FileKindDirectory)
+	}
+}
+
+// writeFile writes a single byte to path, failing the test on error.
+func writeFile(t *testing.T, path string, perm os.FileMode) {
+	t.Helper()
+
+	err := os.WriteFile(path, []byte("x"), perm)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// entryKind returns the Kind value of the entry named name in a ReadDir
+// result, failing the test when the entry is absent or malformed.
+func entryKind(t *testing.T, rows []app.AttributeList, name string) string {
+	t.Helper()
+
+	for _, row := range rows[1:] {
+		if stringAttr(row, attrName) != name {
+			continue
+		}
+
+		raw, found := attrValue(row, attrKind)
+		if !found {
+			t.Fatalf("entry %q has no %s attribute", name, attrKind)
+		}
+
+		kind, isString := raw.(string)
+		if !isString {
+			t.Fatalf("entry %q %s = %T, want string", name, attrKind, raw)
+		}
+
+		return kind
+	}
+
+	t.Fatalf("entry %q not found in listing", name)
+
+	return ""
 }
 
 // entryIsDir returns the IsDir value of the entry named name in a ReadDir

@@ -1,0 +1,21 @@
+/* Dialog frame, cursor, and option styles */
+
+.dialog-box {
+    border-style: double;
+    border-color: #00AAAA;
+    padding: 0 1 0 1;
+    background-color: #000080;
+}
+
+.dialog-cursor {
+    color: #000000;
+    background-color: #00AAAA;
+    font-weight: bold;
+    padding: 0 1 0 1;
+}
+
+.dialog-option {
+    color: #00AAAA;
+    background-color: #000080;
+    padding: 0 1 0 1;
+}

@@ -1,0 +1,28 @@
+/* Buttons and the function-key bar */
+
+.button {
+    color: #000000;
+    background-color: #00AAAA;
+    padding: 0 1 0 1;
+    margin: 0 1 0 1;
+}
+
+.active-button {
+    color: #FFFFFF;
+    background-color: #000080;
+    padding: 0 1 0 1;
+    margin: 0 1 0 1;
+    text-decoration: underline;
+}
+
+.pressed-button {
+    color: #FFFF00;
+    background-color: #000080;
+    padding: 0 1 0 1;
+    margin: 0 1 0 1;
+}
+
+.button-bar {
+    color: #00AAAA;
+    background-color: #000080;
+}

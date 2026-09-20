@@ -380,3 +380,62 @@ func TestLoadStylesTopMenuOverride(t *testing.T) {
 		t.Errorf("menu-pulldown-cursor background = %v, want #222222", styles.PulldownCursorStyle.GetBackground())
 	}
 }
+
+//nolint:paralleltest // t.Chdir mutates the process-global working directory
+func TestLoadStylesFileKinds(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	styles, err := config.LoadStyles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []chromeCase{
+		{name: "file-directory", style: styles.FileDirectoryStyle, fg: lipgloss.Color("#FFFFFF"), bold: true},
+		{name: "file-executable", style: styles.FileExecutableStyle, fg: lipgloss.Color("#55FF55")},
+		{name: "file-symlink", style: styles.FileSymlinkStyle, fg: lipgloss.Color("#55FFFF")},
+		{name: "file-image", style: styles.FileImageStyle, fg: lipgloss.Color("#FF55FF")},
+		{name: "file-archive", style: styles.FileArchiveStyle, fg: lipgloss.Color("#FF5555")},
+		{name: "file-source", style: styles.FileSourceStyle, fg: lipgloss.Color("#FFFF55")},
+		{name: "file-config", style: styles.FileConfigStyle, fg: lipgloss.Color("#AAAAAA")},
+	}
+
+	assertChromeStyles(t, cases)
+
+	seen := make(map[lipgloss.TerminalColor]string, len(cases))
+
+	for _, testCase := range cases {
+		if previous, ok := seen[testCase.fg]; ok {
+			t.Errorf("file kinds %s and %s share foreground %v", previous, testCase.name, testCase.fg)
+		}
+
+		seen[testCase.fg] = testCase.name
+	}
+}
+
+//nolint:paralleltest // t.Chdir mutates the process-global working directory
+func TestLoadStylesFileKindOverride(t *testing.T) {
+	dir := t.TempDir()
+
+	override := []byte(".file-source { color: #123456; }")
+
+	err := os.WriteFile(filepath.Join(dir, "styles.css"), override, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Chdir(dir)
+
+	styles, err := config.LoadStyles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if styles.FileSourceStyle.GetForeground() != lipgloss.Color("#123456") {
+		t.Errorf("file-source foreground = %v, want #123456", styles.FileSourceStyle.GetForeground())
+	}
+
+	if styles.FileImageStyle.GetForeground() != lipgloss.NewStyle().GetForeground() {
+		t.Error("file-image should be unset when the override omits it")
+	}
+}

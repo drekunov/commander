@@ -24,7 +24,7 @@ go run ./cmd/wm-example
 
 ## CSS Theming
 
-Styles are defined in `internal/config/styles.css` and embedded at build time. To override, place a `styles.css` file in the working directory.
+Styles are defined in `internal/config/styles/*.css`, one file per widget type, and concatenated into the embedded theme at build time. To override, place a `styles.css` file in the working directory.
 
 Supported CSS properties:
 

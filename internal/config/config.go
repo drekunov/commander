@@ -1,14 +1,49 @@
 package config
 
 import (
-	_ "embed"
+	"embed"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
-//go:embed styles.css
-var defaultCSS string
+//go:embed styles/*.css
+var defaultStyles embed.FS
+
+const (
+	stylesDir = "styles"
+	cssSuffix = ".css"
+)
+
+// themeCSS assembles the embedded default theme from the per-type stylesheet
+// files, concatenated in filename order. Every selector is defined once, so
+// their order does not change the resulting theme.
+func themeCSS() string {
+	entries, err := defaultStyles.ReadDir(stylesDir)
+	if err != nil {
+		return ""
+	}
+
+	var builder strings.Builder
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), cssSuffix) {
+			continue
+		}
+
+		data, readErr := defaultStyles.ReadFile(path.Join(stylesDir, entry.Name()))
+		if readErr != nil {
+			continue
+		}
+
+		builder.Write(data)
+		builder.WriteString("\n")
+	}
+
+	return builder.String()
+}
 
 type Styles struct {
 	ButtonStyle               lipgloss.Style
@@ -22,6 +57,13 @@ type Styles struct {
 	TableStyle                lipgloss.Style
 	ButtonBarStyle            lipgloss.Style
 	CursorStyle               lipgloss.Style
+	FileDirectoryStyle        lipgloss.Style
+	FileExecutableStyle       lipgloss.Style
+	FileSymlinkStyle          lipgloss.Style
+	FileImageStyle            lipgloss.Style
+	FileArchiveStyle          lipgloss.Style
+	FileSourceStyle           lipgloss.Style
+	FileConfigStyle           lipgloss.Style
 	MenuLabelStyle            lipgloss.Style
 	MenuNumberStyle           lipgloss.Style
 	MenuBackgroundStyle       lipgloss.Style
@@ -47,7 +89,7 @@ func (s Styles) DialogBase() lipgloss.Style {
 // process working directory when present and falling back to the embedded
 // default otherwise.
 func LoadStyles() (Styles, error) {
-	cssData := defaultCSS
+	cssData := themeCSS()
 
 	data, err := os.ReadFile("styles.css")
 	if err == nil {
@@ -68,6 +110,13 @@ func LoadStyles() (Styles, error) {
 		TableStyle:                ApplyStyle(stylesheet[".table"]),
 		ButtonBarStyle:            ApplyStyle(stylesheet[".button-bar"]),
 		CursorStyle:               ApplyStyle(stylesheet[".cursor"]),
+		FileDirectoryStyle:        ApplyStyle(stylesheet[".file-directory"]),
+		FileExecutableStyle:       ApplyStyle(stylesheet[".file-executable"]),
+		FileSymlinkStyle:          ApplyStyle(stylesheet[".file-symlink"]),
+		FileImageStyle:            ApplyStyle(stylesheet[".file-image"]),
+		FileArchiveStyle:          ApplyStyle(stylesheet[".file-archive"]),
+		FileSourceStyle:           ApplyStyle(stylesheet[".file-source"]),
+		FileConfigStyle:           ApplyStyle(stylesheet[".file-config"]),
 		MenuLabelStyle:            ApplyStyle(stylesheet[".menu-label"]),
 		MenuNumberStyle:           ApplyStyle(stylesheet[".menu-number"]),
 		MenuBackgroundStyle:       ApplyStyle(stylesheet[".menu-background"]),

@@ -46,6 +46,18 @@ type Attribute struct {
 
 type AttributeList []Attribute
 
+// File kinds classify directory entries so a panel can style an entry by type.
+// The empty kind marks an entry that matches no category.
+const (
+	FileKindDirectory  = "directory"
+	FileKindSymlink    = "symlink"
+	FileKindExecutable = "executable"
+	FileKindImage      = "image"
+	FileKindArchive    = "archive"
+	FileKindSource     = "source"
+	FileKindConfig     = "config"
+)
+
 type Connector interface {
 	Name() string
 	ReadDir(path string) ([]AttributeList, error)
