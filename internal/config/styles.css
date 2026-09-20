@@ -69,6 +69,35 @@
     font-weight: bold;
 }
 
+.file-directory {
+    color: #FFFFFF;
+    font-weight: bold;
+}
+
+.file-executable {
+    color: #55FF55;
+}
+
+.file-symlink {
+    color: #55FFFF;
+}
+
+.file-image {
+    color: #FF55FF;
+}
+
+.file-archive {
+    color: #FF5555;
+}
+
+.file-source {
+    color: #FFFF55;
+}
+
+.file-config {
+    color: #AAAAAA;
+}
+
 .menu-label {
     color: #000000;
     background-color: #008080;

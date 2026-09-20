@@ -22,6 +22,13 @@ type Styles struct {
 	TableStyle                lipgloss.Style
 	ButtonBarStyle            lipgloss.Style
 	CursorStyle               lipgloss.Style
+	FileDirectoryStyle        lipgloss.Style
+	FileExecutableStyle       lipgloss.Style
+	FileSymlinkStyle          lipgloss.Style
+	FileImageStyle            lipgloss.Style
+	FileArchiveStyle          lipgloss.Style
+	FileSourceStyle           lipgloss.Style
+	FileConfigStyle           lipgloss.Style
 	MenuLabelStyle            lipgloss.Style
 	MenuNumberStyle           lipgloss.Style
 	MenuBackgroundStyle       lipgloss.Style
@@ -68,6 +75,13 @@ func LoadStyles() (Styles, error) {
 		TableStyle:                ApplyStyle(stylesheet[".table"]),
 		ButtonBarStyle:            ApplyStyle(stylesheet[".button-bar"]),
 		CursorStyle:               ApplyStyle(stylesheet[".cursor"]),
+		FileDirectoryStyle:        ApplyStyle(stylesheet[".file-directory"]),
+		FileExecutableStyle:       ApplyStyle(stylesheet[".file-executable"]),
+		FileSymlinkStyle:          ApplyStyle(stylesheet[".file-symlink"]),
+		FileImageStyle:            ApplyStyle(stylesheet[".file-image"]),
+		FileArchiveStyle:          ApplyStyle(stylesheet[".file-archive"]),
+		FileSourceStyle:           ApplyStyle(stylesheet[".file-source"]),
+		FileConfigStyle:           ApplyStyle(stylesheet[".file-config"]),
 		MenuLabelStyle:            ApplyStyle(stylesheet[".menu-label"]),
 		MenuNumberStyle:           ApplyStyle(stylesheet[".menu-number"]),
 		MenuBackgroundStyle:       ApplyStyle(stylesheet[".menu-background"]),

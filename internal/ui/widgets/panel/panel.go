@@ -10,8 +10,10 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/drekunov/gc/internal/app"
 	"github.com/drekunov/gc/internal/config"
+	"github.com/mattn/go-runewidth"
 )
 
 const (
@@ -27,7 +29,12 @@ const (
 	attrName  = "Name"
 	attrSize  = "Size"
 	attrIsDir = "IsDir"
+	attrKind  = "Kind"
 )
+
+// nameSGRSentinel is a private-use rune used to extract the opening ANSI
+// sequence a style would emit for its text.
+const nameSGRSentinel = "\uE000"
 
 // columnSpec describes one visible table column declared by a header row.
 type columnSpec struct {
@@ -62,6 +69,11 @@ type Model struct {
 	id   app.PanelID
 	dir  string
 	rows []app.AttributeList
+
+	// rowKinds holds the file kind of each display row, aligned with the order
+	// produced by displayRowsFor (the synthetic parent row included), so the
+	// render step can color each row's Name cell by kind.
+	rowKinds []string
 
 	// pendingSelect names the entry to place the cursor on when the next
 	// listing arrives: set when ascending so the directory just left is
@@ -160,7 +172,128 @@ func (m *Model) View() string {
 	m.tableView.SetHeight(m.height)
 	m.tableView.SetStyles(m.tableStyles())
 
-	return m.styles.TableStyle.Render(m.tableView.View())
+	return m.colorizeKinds(m.styles.TableStyle.Render(m.tableView.View()))
+}
+
+// kindSGR returns the opening and closing ANSI sequences for a kind style. The
+// closing sequence resets only the properties the style sets, so the table
+// background and any cursor highlight survive around the colored name. It
+// returns ok=false for the zero style or when colors are disabled.
+func kindSGR(style lipgloss.Style) (string, string, bool) {
+	rendered := style.Render(nameSGRSentinel)
+	if rendered == nameSGRSentinel {
+		return "", "", false
+	}
+
+	open := strings.TrimSuffix(rendered, nameSGRSentinel+"\x1b[0m")
+	if open == "" || open == rendered {
+		return "", "", false
+	}
+
+	var closeSeq strings.Builder
+
+	if style.GetForeground() != (lipgloss.NoColor{}) {
+		closeSeq.WriteString("\x1b[39m")
+	}
+
+	if style.GetBackground() != (lipgloss.NoColor{}) {
+		closeSeq.WriteString("\x1b[49m")
+	}
+
+	if style.GetBold() {
+		closeSeq.WriteString("\x1b[22m")
+	}
+
+	if style.GetUnderline() {
+		closeSeq.WriteString("\x1b[24m")
+	}
+
+	return open, closeSeq.String(), true
+}
+
+// spliceCell wraps the cell at [left, left+width) of an ANSI-containing line
+// with open and closeSeq, leaving every escape sequence already in the line in
+// place so inherited styling continues through the cell.
+func spliceCell(line string, left, width int, open, closeSeq string) string {
+	begin := byteOffsetAt(line, left)
+
+	end := byteOffsetAt(line, left+width)
+	if begin >= end || end > len(line) {
+		return line
+	}
+
+	return line[:begin] + open + line[begin:end] + closeSeq + line[end:]
+}
+
+// byteOffsetAt returns the byte index in text where the visible column col
+// begins, counting ANSI escape sequences as zero width.
+func byteOffsetAt(text string, col int) int {
+	if col <= 0 {
+		return 0
+	}
+
+	var (
+		state  byte
+		width  int
+		pos    int
+		parser = ansi.NewParser()
+	)
+
+	for pos < len(text) {
+		_, cellWidth, read, newState := ansi.DecodeSequence(text[pos:], state, parser)
+		if cellWidth > 0 && width+cellWidth > col {
+			break
+		}
+
+		width += cellWidth
+		state = newState
+		pos += read
+	}
+
+	return pos
+}
+
+// plainRowLine reproduces the bubbles table's plain rendering of one row, so a
+// rendered line can be matched back to the row that produced it.
+func plainRowLine(row table.Row, cols []table.Column) string {
+	var builder strings.Builder
+
+	for idx, value := range row {
+		if idx >= len(cols) || cols[idx].Width <= 0 {
+			continue
+		}
+
+		width := cols[idx].Width
+		text := runewidth.Truncate(value, width, "…")
+		pad := width - lipgloss.Width(text)
+
+		builder.WriteByte(' ')
+		builder.WriteString(text)
+
+		if pad > 0 {
+			builder.WriteString(strings.Repeat(" ", pad))
+		}
+
+		builder.WriteByte(' ')
+	}
+
+	return builder.String()
+}
+
+// nameColumnLeft returns the visual column where the column at idx begins,
+// including the per-cell left padding of every preceding column.
+func nameColumnLeft(cols []table.Column, idx int) int {
+	left := 1
+
+	for j := range idx {
+		left += cols[j].Width + 2
+	}
+
+	return left
+}
+
+func clampInt(value, low, high int) int {
+	return min(max(value, low), high)
 }
 
 // SetData rebuilds the table for dir from a listing whose first row is the
@@ -244,6 +377,132 @@ func (m *Model) SortBy(title string) {
 // first row. A refresh uses it to keep the user's place.
 func (m *Model) PreserveSelection() {
 	m.pendingSelect = m.selectedEntryName()
+}
+
+// colorizeKinds paints the Name cell of each visible entry with the injected
+// style for its file kind. It splices a foreground-only ANSI sequence into the
+// already-rendered table, so the table's own width and truncation handling is
+// untouched. Rows are matched by their plain rendered text rather than by line
+// position, because the table does not expose its viewport scroll offset. The
+// focused cursor row is left uncolored so the cursor style stays uniform.
+func (m *Model) colorizeKinds(view string) string {
+	cols := m.tableView.Columns()
+
+	nameIdx, nameWidth := m.nameSpan(cols)
+	if nameIdx < 0 || nameWidth <= 0 {
+		return view
+	}
+
+	left := nameColumnLeft(cols, nameIdx)
+	matches := m.rowLineMatches()
+
+	lines := strings.Split(view, "\n")
+
+	for idx := 1; idx < len(lines); idx++ {
+		match, found := matches[strings.TrimRight(ansi.Strip(lines[idx]), " ")]
+		if !found || match.conflict {
+			continue
+		}
+
+		if match.isCursor && m.tableView.Focused() {
+			continue
+		}
+
+		open, closeSeq, found := kindSGR(m.kindStyle(match.kind))
+		if !found {
+			continue
+		}
+
+		lines[idx] = spliceCell(lines[idx], left, nameWidth, open, closeSeq)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// rowLineMatch describes the entry a rendered line belongs to.
+type rowLineMatch struct {
+	kind     string
+	isCursor bool
+	conflict bool
+}
+
+// rowLineMatches maps the plain rendered text of every row that can be visible
+// to that row's kind and cursor state. The candidate window is the same one the
+// bubbles table builds its content from, so every visible line is covered
+// without relying on the table's internal scroll offset.
+func (m *Model) rowLineMatches() map[string]rowLineMatch {
+	rows := m.tableView.Rows()
+	cols := m.tableView.Columns()
+	cursor := m.tableView.Cursor()
+	height := m.tableView.Height()
+
+	start := clampInt(cursor-height, 0, cursor)
+	end := clampInt(cursor+height, cursor, len(rows))
+
+	matches := make(map[string]rowLineMatch, end-start)
+
+	for idx := start; idx < end; idx++ {
+		plain := strings.TrimRight(plainRowLine(rows[idx], cols), " ")
+		info := rowLineMatch{kind: m.rowKindAt(idx), isCursor: idx == cursor}
+
+		existing, found := matches[plain]
+		if !found {
+			matches[plain] = info
+
+			continue
+		}
+
+		if existing.kind != info.kind || existing.isCursor != info.isCursor {
+			existing.conflict = true
+			matches[plain] = existing
+		}
+	}
+
+	return matches
+}
+
+// rowKindAt returns the file kind of the display row at idx, or "" when the
+// index is out of range.
+func (m *Model) rowKindAt(idx int) string {
+	if idx < 0 || idx >= len(m.rowKinds) {
+		return ""
+	}
+
+	return m.rowKinds[idx]
+}
+
+// kindStyle returns the injected style for a file kind, or the zero style when
+// the kind is absent or unknown.
+func (m *Model) kindStyle(kind string) lipgloss.Style {
+	switch kind {
+	case app.FileKindDirectory:
+		return m.styles.FileDirectoryStyle
+	case app.FileKindExecutable:
+		return m.styles.FileExecutableStyle
+	case app.FileKindSymlink:
+		return m.styles.FileSymlinkStyle
+	case app.FileKindImage:
+		return m.styles.FileImageStyle
+	case app.FileKindArchive:
+		return m.styles.FileArchiveStyle
+	case app.FileKindSource:
+		return m.styles.FileSourceStyle
+	case app.FileKindConfig:
+		return m.styles.FileConfigStyle
+	default:
+		return lipgloss.NewStyle()
+	}
+}
+
+// nameSpan returns the index and width of the Name column, or -1 when it is not
+// among the visible columns.
+func (m *Model) nameSpan(cols []table.Column) (int, int) {
+	idx := m.columnIndex(attrName)
+	if idx < 0 || idx >= len(cols) {
+		return -1, 0
+	}
+
+	return idx, cols[idx].Width
 }
 
 // positionCursor places the table cursor on display row idx and scrolls the
@@ -549,23 +808,37 @@ func (m *Model) cursorForPendingSelect() int {
 }
 
 // displayRowsFor renders the synthetic parent row (when applicable) followed
-// by one row per real entry.
+// by one row per real entry, recording each row's file kind in the same order.
 func (m *Model) displayRowsFor(entries []app.AttributeList) []table.Row {
 	if len(m.tableView.Columns()) == 0 {
 		m.setDefaultColumns()
 	}
 
+	m.rowKinds = m.rowKinds[:0]
+
 	rows := make([]table.Row, 0, len(entries)+1)
 
 	if m.showParent() {
 		rows = append(rows, m.parentRow())
+		m.rowKinds = append(m.rowKinds, app.FileKindDirectory)
 	}
 
 	for _, entry := range entries {
 		rows = append(rows, rowFromAttrList(entry))
+		m.rowKinds = append(m.rowKinds, entryKind(entry))
 	}
 
 	return rows
+}
+
+// entryKind returns an entry's hidden file kind, or "" when it carries none.
+func entryKind(entry app.AttributeList) string {
+	value, ok := attrValue(entry, attrKind)
+	if !ok {
+		return ""
+	}
+
+	return fmt.Sprint(value)
 }
 
 // setDefaultColumns installs columns for a listing delivered without a header

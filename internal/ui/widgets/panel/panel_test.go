@@ -8,8 +8,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/drekunov/gc/internal/app"
 	"github.com/drekunov/gc/internal/config"
+	"github.com/muesli/termenv"
 )
 
 const (
@@ -18,6 +20,7 @@ const (
 	attrDate       = "Date"
 	attrTime       = "Time"
 	subName        = "sub"
+	mainName       = "main.go"
 )
 
 // testListing builds a listing whose entries are files unless their name
@@ -1198,5 +1201,288 @@ func TestSchemaChangeResetsSortAndRows(t *testing.T) {
 		if len(row) != 2 {
 			t.Errorf("row %d has %d cells, want 2", idx, len(row))
 		}
+	}
+}
+
+// testEntry describes one listing entry for the file-kind tests.
+type testEntry struct {
+	name string
+	kind string
+	dir  bool
+}
+
+// typedListing builds a Name/Size/Date/Time listing with hidden IsDir and Kind
+// attributes, matching the filesystem connector's schema.
+func typedListing(entries ...testEntry) []app.AttributeList {
+	header := app.AttributeList{
+		{AttrName: attrName, AttrValue: attrName, Width: 11, Flex: true},
+		{AttrName: attrSize, AttrValue: attrSize, Width: 6},
+		{AttrName: attrDate, AttrValue: attrDate, Width: 10},
+		{AttrName: attrTime, AttrValue: attrTime, Width: 8},
+		{AttrName: attrIsDir, AttrValue: attrIsDir, Hidden: true},
+		{AttrName: attrKind, AttrValue: attrKind, Hidden: true},
+	}
+
+	data := make([]app.AttributeList, 0, len(entries)+1)
+	data = append(data, header)
+
+	for _, entry := range entries {
+		data = append(data, app.AttributeList{
+			{AttrName: attrName, AttrValue: entry.name},
+			{AttrName: attrSize, AttrValue: "1"},
+			{AttrName: attrDate, AttrValue: "2026-01-01"},
+			{AttrName: attrTime, AttrValue: "00:00:00"},
+			{AttrName: attrIsDir, AttrValue: entry.dir, Hidden: true},
+			{AttrName: attrKind, AttrValue: entry.kind, Hidden: true},
+		})
+	}
+
+	return data
+}
+
+// kindStyles returns the injected styles used by the coloring tests.
+func kindStyles() config.Styles {
+	return config.Styles{
+		TableStyle:          lipgloss.NewStyle().Background(lipgloss.Color("#000080")),
+		CursorStyle:         lipgloss.NewStyle().Background(lipgloss.Color("#C0C0C0")),
+		FileDirectoryStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true),
+		FileExecutableStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#55FF55")),
+		FileSymlinkStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#55FFFF")),
+		FileImageStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("#FF55FF")),
+		FileArchiveStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5555")),
+		FileSourceStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF55")),
+		FileConfigStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA")),
+	}
+}
+
+// useTrueColor forces color output for the test's duration so injected SGR
+// sequences are observable. It cannot run in parallel with other tests because
+// the color profile is process-global.
+func useTrueColor(t *testing.T) {
+	t.Helper()
+
+	previous := lipgloss.ColorProfile()
+
+	lipgloss.SetColorProfile(termenv.TrueColor)
+
+	t.Cleanup(func() { lipgloss.SetColorProfile(previous) })
+}
+
+// openFor returns the opening ANSI sequence the style emits for its text, or ""
+// for the zero style.
+func openFor(style lipgloss.Style) string {
+	rendered := style.Render(nameSGRSentinel)
+	open, _, _ := strings.Cut(rendered, nameSGRSentinel)
+
+	return open
+}
+
+//nolint:paralleltest // useTrueColor mutates the process-global color profile
+func TestPanelColorsNameByKind(t *testing.T) {
+	useTrueColor(t)
+
+	styles := kindStyles()
+	model := NewPanel(styles)
+	model.SetWidth(60)
+	model.SetHeight(10)
+	model.Focus()
+	model.SetData("/", typedListing(
+		testEntry{name: "aaa.txt"},
+		testEntry{name: mainName, kind: app.FileKindSource},
+		testEntry{name: "photo.png", kind: app.FileKindImage},
+	))
+
+	view := model.View()
+
+	sourceOpen := openFor(styles.FileSourceStyle)
+	imageOpen := openFor(styles.FileImageStyle)
+
+	if !strings.Contains(view, sourceOpen+mainName) {
+		t.Errorf("source Name cell not colored:\n%q", view)
+	}
+
+	if !strings.Contains(view, imageOpen+"photo.png") {
+		t.Errorf("image Name cell not colored:\n%q", view)
+	}
+
+	if strings.Contains(view, sourceOpen+"aaa.txt") {
+		t.Error("unclassified Name cell should not be colored")
+	}
+
+	if strings.Contains(view, sourceOpen+"Name") || strings.Contains(view, sourceOpen+"Size") {
+		t.Error("header cells should not be colored")
+	}
+
+	if openFor(lipgloss.NewStyle()) != "" {
+		t.Error("the zero style should emit no opening sequence")
+	}
+}
+
+//nolint:paralleltest // useTrueColor mutates the process-global color profile
+func TestPanelKindColoringKeepsLayout(t *testing.T) {
+	useTrueColor(t)
+
+	listing := typedListing(
+		testEntry{name: "dir", kind: app.FileKindDirectory, dir: true},
+		testEntry{name: "archive.tar.gz", kind: app.FileKindArchive},
+		testEntry{name: mainName, kind: app.FileKindSource},
+		testEntry{name: "photo.png", kind: app.FileKindImage},
+	)
+
+	styledModel := NewPanel(kindStyles())
+	styledModel.SetWidth(60)
+	styledModel.SetHeight(10)
+	styledModel.SetData("/", listing)
+
+	plainStyles := config.Styles{TableStyle: lipgloss.NewStyle().Background(lipgloss.Color("#000080"))}
+	plainModel := NewPanel(plainStyles)
+	plainModel.SetWidth(60)
+	plainModel.SetHeight(10)
+	plainModel.SetData("/", listing)
+
+	if got, want := ansi.Strip(styledModel.View()), ansi.Strip(plainModel.View()); got != want {
+		t.Errorf("kind coloring changed the layout:\n got %q\nwant %q", got, want)
+	}
+}
+
+//nolint:paralleltest // useTrueColor mutates the process-global color profile
+func TestPanelCursorRowOverridesKind(t *testing.T) {
+	useTrueColor(t)
+
+	styles := kindStyles()
+	model := NewPanel(styles)
+	model.SetWidth(60)
+	model.SetHeight(10)
+	model.SetData("/", typedListing(
+		testEntry{name: "sub", kind: app.FileKindDirectory, dir: true},
+		testEntry{name: mainName, kind: app.FileKindSource},
+	))
+
+	dirOpen := openFor(styles.FileDirectoryStyle)
+	sourceOpen := openFor(styles.FileSourceStyle)
+
+	model.Focus()
+
+	focused := model.View()
+	if strings.Contains(focused, dirOpen+"sub") {
+		t.Error("focused cursor row should not carry the kind color")
+	}
+
+	if !strings.Contains(focused, sourceOpen+mainName) {
+		t.Error("non-cursor row should carry its kind color")
+	}
+
+	model.Blur()
+
+	if blurred := model.View(); !strings.Contains(blurred, dirOpen+"sub") {
+		t.Error("blurred panel should color the formerly cursor row")
+	}
+}
+
+//nolint:paralleltest // useTrueColor mutates the process-global color profile
+func TestPanelKindFallback(t *testing.T) {
+	useTrueColor(t)
+
+	styles := kindStyles()
+	sourceOpen := openFor(styles.FileSourceStyle)
+
+	model := NewPanel(styles)
+	model.SetWidth(60)
+	model.SetHeight(10)
+	model.Focus()
+	model.SetData("/", typedListing(
+		testEntry{name: "aaa.txt"},
+		testEntry{name: "mystery.bin", kind: "mystery"},
+		testEntry{name: "nokind.xyz"},
+		testEntry{name: mainName, kind: app.FileKindSource},
+	))
+
+	view := model.View()
+	if !strings.Contains(view, sourceOpen+mainName) {
+		t.Errorf("known kind should be colored:\n%q", view)
+	}
+
+	if strings.Contains(view, sourceOpen+"mystery") || strings.Contains(view, sourceOpen+"nokind") {
+		t.Error("unknown or absent kind should keep the default style")
+	}
+
+	noClass := kindStyles()
+	noClass.FileSourceStyle = lipgloss.NewStyle()
+
+	missing := NewPanel(noClass)
+	missing.SetWidth(60)
+	missing.SetHeight(10)
+	missing.SetData("/", typedListing(testEntry{name: mainName, kind: app.FileKindSource}))
+
+	if missingView := missing.View(); strings.Contains(missingView, sourceOpen) {
+		t.Error("a kind with no injected class should not be colored")
+	}
+
+	// A listing without any Kind attribute splices nothing.
+	untyped := NewPanel(kindStyles())
+	untyped.SetWidth(60)
+	untyped.SetHeight(10)
+	untyped.Focus()
+	untyped.SetData("/", testListing("fa", "fb"))
+
+	if untypedView := untyped.View(); strings.Contains(untypedView, sourceOpen) {
+		t.Error("a listing with no Kind attribute should not be colored")
+	}
+}
+
+//nolint:paralleltest // useTrueColor mutates the process-global color profile
+func TestPanelColorsScrolledRows(t *testing.T) {
+	useTrueColor(t)
+
+	styles := kindStyles()
+	model := NewPanel(styles)
+	model.SetWidth(60)
+	model.SetHeight(6)
+
+	entries := make([]testEntry, 0, 20)
+
+	for idx := range 20 {
+		kind := app.FileKindSource
+		if idx%2 == 1 {
+			kind = app.FileKindImage
+		}
+
+		entries = append(entries, testEntry{name: fmt.Sprintf("file%02d", idx), kind: kind})
+	}
+
+	model.SetData("/", typedListing(entries...))
+	model.Blur()
+
+	for range 12 {
+		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+		model = mustPanelModel(t, updated)
+	}
+
+	view := model.View()
+	sourceOpen := openFor(styles.FileSourceStyle)
+	imageOpen := openFor(styles.FileImageStyle)
+
+	visible := 0
+
+	for idx := range 20 {
+		name := fmt.Sprintf("file%02d", idx)
+		if !strings.Contains(view, name) {
+			continue
+		}
+
+		visible++
+
+		open := sourceOpen
+		if idx%2 == 1 {
+			open = imageOpen
+		}
+
+		if !strings.Contains(view, open+name) {
+			t.Errorf("visible scrolled row %s not colored with its kind:\n%q", name, view)
+		}
+	}
+
+	if visible == 0 {
+		t.Fatal("no rows visible after scrolling")
 	}
 }
